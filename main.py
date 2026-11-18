@@ -57,6 +57,7 @@ def main() -> int:
 
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
+    app.setQuitOnLastWindowClosed(False)
 
     icon_path = get_resource_path("icon.png")
     if icon_path.exists():

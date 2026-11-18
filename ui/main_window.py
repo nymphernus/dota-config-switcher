@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from PySide6.QtCore import QEvent, QSize, Qt, QThreadPool, QTimer
-from PySide6.QtGui import QFontMetrics, QIcon
+from PySide6.QtGui import QAction, QCloseEvent, QFontMetrics, QIcon
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QInputDialog,
     QLabel,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QProgressBar,
     QPushButton,
@@ -24,6 +25,7 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QStatusBar,
     QStyle,
+    QSystemTrayIcon,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -66,19 +68,26 @@ class MainWindow(QMainWindow):
         self.resize(800, 600)
         self.setMinimumSize(720, 520)
 
+        self._app_icon = QIcon()
         icon_path = get_resource_path("icon.png")
         if icon_path.exists():
-            self.setWindowIcon(QIcon(str(icon_path)))
+            self._app_icon = QIcon(str(icon_path))
+            self.setWindowIcon(self._app_icon)
 
         self.settings_data: Dict[str, Any] = load_settings()
         self.accounts: List[Dict[str, Any]] = []
         self.profiles: Dict[str, Dict[str, Any]] = {}
+        self.configs_cache: List[ConfigInfo] = []
         self.current_copy_worker: Optional[CopyWorker] = None
         self.thread_pool = QThreadPool.globalInstance()
         self._current_steam_path: str = ""
+        self._is_quitting: bool = False
+        self.tray_icon: Optional[QSystemTrayIcon] = None
+        self.tray_menu: Optional[QMenu] = None
 
         self._build_ui()
         self._apply_styles()
+        self._init_tray_icon()
 
         QTimer.singleShot(0, self.initialize_state)
 
@@ -285,6 +294,7 @@ class MainWindow(QMainWindow):
             QScrollArea { background: transparent; }
             QMenu { background-color: #252536; color: #e6e6f0; border: 1px solid #3a3a4d; }
             QMenu::item:selected { background-color: #3a4a6a; }
+            QMenu::separator { height: 1px; background: #3a3a4d; margin: 4px 6px; }
             QMessageBox QLabel { color: #e6e6f0; }
             QLineEdit { background-color: #2a2a3a; border: 1px solid #3a3a4d; border-radius: 6px; padding: 6px; }
             """
@@ -303,6 +313,9 @@ class MainWindow(QMainWindow):
         if migration_msg:
             QMessageBox.information(self, "Миграция данных", migration_msg)
             self.set_status("Данные перенесены в AppData", "ok")
+
+        self._update_tray_menu()
+        self._update_tray_tooltip()
 
     def ensure_steam_path(self) -> None:
         steam_path = (self.settings_data.get("steam_path") or "").strip()
@@ -503,6 +516,8 @@ class MainWindow(QMainWindow):
             self.account_combo.setItemData(i, tooltip, Qt.ToolTipRole)
             self.account_combo.setItemText(i, display_name)
         self._update_favorite_button()
+        self._update_tray_menu()
+        self._update_tray_tooltip()
 
     def refresh_profiles_async(self, force: bool = False) -> None:
         if not self.accounts:
@@ -564,6 +579,8 @@ class MainWindow(QMainWindow):
         # Rebuild list so favorite is first; keep current selection
         self.settings_data["selected_account_id"] = aid
         self.refresh_accounts(select_saved=True, prefer_favorite=False)
+        self._update_tray_menu()
+        self._update_tray_tooltip()
 
     # --- Configs ---
     def get_configs_dir(self) -> str:
@@ -588,6 +605,9 @@ class MainWindow(QMainWindow):
             self.set_status("Ошибка чтения конфигов", "error")
             QMessageBox.warning(self, "Ошибка", f"Не удалось прочитать список конфигов: {e}")
             configs = []
+
+        self.configs_cache = configs
+        self._update_tray_menu()
 
         if not configs:
             self.scroll.setVisible(False)
@@ -693,6 +713,7 @@ class MainWindow(QMainWindow):
             account_id,
             busy_text=f"Применение '{cfg_name}'...",
             success_message=f"Конфиг '{cfg_name}' применён",
+            on_success=lambda _p, n=cfg_name: self._record_last_applied_config(n),
         )
 
     def confirm_delete_config(self, config_path: str) -> None:
@@ -733,6 +754,120 @@ class MainWindow(QMainWindow):
         from ui.config_details_dialog import ConfigDetailsDialog
         dlg = ConfigDetailsDialog(Path(config_path).name, details, self)
         dlg.exec()
+
+    def _record_last_applied_config(self, config_name: str) -> None:
+        self.settings_data["last_applied_config"] = str(config_name or "")
+        save_settings(self.settings_data)
+        self._update_tray_tooltip()
+
+    def _init_tray_icon(self) -> None:
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            LOGGER.warning("System tray is not available")
+            return
+        icon = self._app_icon if not self._app_icon.isNull() else self.style().standardIcon(QStyle.SP_ComputerIcon)
+        self.tray_icon = QSystemTrayIcon(icon, self)
+        self.tray_icon.setToolTip("DotaConfigSwitcher")
+        self.tray_menu = QMenu(self)
+        self.tray_menu.aboutToShow.connect(self._update_tray_menu)
+        self.tray_icon.setContextMenu(self.tray_menu)
+        self.tray_icon.activated.connect(self._on_tray_activated)
+        self.tray_icon.show()
+        self._update_tray_menu()
+        self._update_tray_tooltip()
+
+    def _get_favorite_profile_display_name(self) -> str:
+        fav = self._sanitize_account_id(self.settings_data.get("favorite_account_id")) or ""
+        if not fav:
+            return "не выбран"
+        prof = self.profiles.get(fav, {}) if isinstance(self.profiles, dict) else {}
+        name = prof.get("personaname") or fav
+        return str(name)
+
+    def _update_tray_menu(self) -> None:
+        if not self.tray_menu:
+            return
+        self.tray_menu.clear()
+
+        profile_name = self._get_favorite_profile_display_name()
+        title_action = self.tray_menu.addAction(f"Профиль: {profile_name}")
+        title_action.setEnabled(False)
+
+        open_action = self.tray_menu.addAction("Открыть приложение")
+        open_action.triggered.connect(self.show_from_tray)
+        self.tray_menu.addSeparator()
+
+        configs = list(self.configs_cache) if hasattr(self, "configs_cache") else []
+        if configs:
+            for cfg in configs:
+                act = self.tray_menu.addAction(cfg.name)
+                act.triggered.connect(lambda _checked=False, p=cfg.path, n=cfg.name: self.quick_apply_config_from_tray(p, n))
+        else:
+            empty_act = self.tray_menu.addAction("Нет сохранённых конфигов")
+            empty_act.setEnabled(False)
+
+        self.tray_menu.addSeparator()
+        quit_action = self.tray_menu.addAction("Выход")
+        quit_action.triggered.connect(self.quit_from_tray)
+
+    def _update_tray_tooltip(self) -> None:
+        if not self.tray_icon:
+            return
+        last = str(self.settings_data.get("last_applied_config") or "").strip()
+        if last:
+            self.tray_icon.setToolTip(f"DotaConfigSwitcher\nТекущий активный конфиг: {last}")
+        else:
+            self.tray_icon.setToolTip("DotaConfigSwitcher")
+
+    def _on_tray_activated(self, reason) -> None:
+        if reason == QSystemTrayIcon.ActivationReason.Trigger:
+            self.show_from_tray()
+
+    def show_from_tray(self) -> None:
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+
+    def quit_from_tray(self) -> None:
+        self._is_quitting = True
+        if self.tray_icon:
+            self.tray_icon.hide()
+        app = QApplication.instance()
+        if app:
+            app.quit()
+
+    def quick_apply_config_from_tray(self, config_path: str, config_name: str) -> None:
+        steam_path = str(self.settings_data.get("steam_path") or "").strip()
+        favorite_id = self._sanitize_account_id(self.settings_data.get("favorite_account_id")) or ""
+        if not steam_path or not Path(steam_path).exists():
+            if self.tray_icon:
+                self.tray_icon.showMessage("DotaConfigSwitcher", "Путь к Steam не задан или не найден.", QSystemTrayIcon.Warning, 4000)
+            return
+        if not favorite_id:
+            if self.tray_icon:
+                self.tray_icon.showMessage("DotaConfigSwitcher", "Избранный профиль Steam не выбран.", QSystemTrayIcon.Warning, 4000)
+            return
+        try:
+            apply_config(config_path, steam_path, favorite_id)
+            self._record_last_applied_config(config_name)
+            self.set_status(f"Конфиг '{config_name}' применён (трей)", "ok")
+            if self.tray_icon:
+                self.tray_icon.showMessage(
+                    "DotaConfigSwitcher",
+                    f"Конфиг '{config_name}' применён для избранного профиля.",
+                    QSystemTrayIcon.Information,
+                    3000,
+                )
+        except Exception as e:
+            LOGGER.exception("Tray quick-apply failed: %s", e)
+            if self.tray_icon:
+                self.tray_icon.showMessage("DotaConfigSwitcher", f"Ошибка применения: {e}", QSystemTrayIcon.Critical, 5000)
+
+    def closeEvent(self, event: QCloseEvent) -> None:  # type: ignore[override]
+        if self._is_quitting or not self.tray_icon or not self.tray_icon.isVisible():
+            event.accept()
+            return
+        event.ignore()
+        self.hide()
 
     def open_import_dialog(self) -> None:
         configs_dir = self.get_configs_dir()
