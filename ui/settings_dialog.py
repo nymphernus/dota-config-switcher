@@ -7,6 +7,7 @@ from typing import Any, Dict
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QCheckBox,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
@@ -69,6 +70,9 @@ class SettingsDialog(QDialog):
         configs_wrap.setLayout(configs_row)
         form.addRow("Папка конфигов:", configs_wrap)
 
+        self.autostart_checkbox = QCheckBox("Запускать вместе с Windows")
+        form.addRow("", self.autostart_checkbox)
+
         layout.addLayout(form)
         layout.addStretch(1)
 
@@ -82,6 +86,7 @@ class SettingsDialog(QDialog):
     def _load_values(self) -> None:
         self.steam_path_edit.setText(str(self._settings.get("steam_path") or ""))
         self.configs_dir_edit.setText(str(self._settings.get("configs_dir") or ""))
+        self.autostart_checkbox.setChecked(bool(self._settings.get("autostart", False)))
 
     def browse_steam_path(self) -> None:
         current = self.steam_path_edit.text().strip() or str(Path.home())
@@ -99,6 +104,7 @@ class SettingsDialog(QDialog):
         data = dict(self._settings)
         data["steam_path"] = self.steam_path_edit.text().strip()
         data["configs_dir"] = self.configs_dir_edit.text().strip()
+        data["autostart"] = self.autostart_checkbox.isChecked()
         # Drop legacy keys if present in old settings dict
         data.pop("api_key", None)
         data.pop("check_avatar_updates", None)
