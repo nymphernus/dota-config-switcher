@@ -63,6 +63,7 @@ def main() -> int:
         pass
 
     app = QApplication(sys.argv)
+    app.setStyle("Fusion")
     app.setApplicationName(APP_NAME)
     app.setQuitOnLastWindowClosed(False)
 
