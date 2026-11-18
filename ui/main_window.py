@@ -1,4 +1,4 @@
-"""Main application window."""
+﻿"""Main application window."""
 
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ LOGGER = logging.getLogger(__name__)
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Dota 2 Config Switcher")
+        self.setWindowTitle("DotaConfigSwitcher")
         self.resize(800, 600)
         self.setMinimumSize(720, 520)
 
@@ -94,7 +94,7 @@ class MainWindow(QMainWindow):
 
         self.change_path_btn = QToolButton()
         self.change_path_btn.setObjectName("IconButton")
-        self.change_path_btn.setToolTip("Выбрать папку Steam")
+        self.change_path_btn.setToolTip("Р’С‹Р±СЂР°С‚СЊ РїР°РїРєСѓ Steam")
         self.change_path_btn.setIcon(self.style().standardIcon(QStyle.SP_DirOpenIcon))
         self.change_path_btn.clicked.connect(self.choose_steam_path)
         path_layout.addWidget(self.change_path_btn)
@@ -102,9 +102,9 @@ class MainWindow(QMainWindow):
 
         self.settings_btn = QToolButton()
         self.settings_btn.setObjectName("IconButton")
-        self.settings_btn.setToolTip("Настройки")
+        self.settings_btn.setToolTip("РќР°СЃС‚СЂРѕР№РєРё")
         self.settings_btn.setIcon(self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
-        self.settings_btn.setText("⚙")
+        self.settings_btn.setText("вљ™")
         self.settings_btn.clicked.connect(self.open_settings_dialog)
         top_layout.addWidget(self.settings_btn, 0, Qt.AlignRight)
         root.addWidget(top_bar)
@@ -127,10 +127,10 @@ class MainWindow(QMainWindow):
         empty_layout = QVBoxLayout(self.empty_state)
         empty_layout.setAlignment(Qt.AlignCenter)
         empty_layout.setSpacing(12)
-        self.empty_label = QLabel("Нет сохранённых конфигов")
+        self.empty_label = QLabel("РќРµС‚ СЃРѕС…СЂР°РЅС‘РЅРЅС‹С… РєРѕРЅС„РёРіРѕРІ")
         self.empty_label.setAlignment(Qt.AlignCenter)
         self.empty_label.setObjectName("EmptyLabel")
-        self.empty_save_btn = QPushButton("Сохранить текущий")
+        self.empty_save_btn = QPushButton("РЎРѕС…СЂР°РЅРёС‚СЊ С‚РµРєСѓС‰РёР№")
         self.empty_save_btn.setObjectName("PrimaryButton")
         self.empty_save_btn.clicked.connect(self.save_current_config_dialog)
         empty_layout.addWidget(self.empty_label)
@@ -154,25 +154,25 @@ class MainWindow(QMainWindow):
         row = QHBoxLayout()
         row.setSpacing(8)
 
-        self.save_btn = QPushButton("Сохранить текущий конфиг")
+        self.save_btn = QPushButton("РЎРѕС…СЂР°РЅРёС‚СЊ С‚РµРєСѓС‰РёР№ РєРѕРЅС„РёРі")
         self.save_btn.setObjectName("PrimaryButton")
         self.save_btn.clicked.connect(self.save_current_config_dialog)
         row.addWidget(self.save_btn, 2)
 
         self.refresh_btn = QToolButton()
-        self.refresh_btn.setToolTip("Обновить (конфиги, аккаунты, профили)")
-        self.refresh_btn.setText("↻")
+        self.refresh_btn.setToolTip("РћР±РЅРѕРІРёС‚СЊ (РєРѕРЅС„РёРіРё, Р°РєРєР°СѓРЅС‚С‹, РїСЂРѕС„РёР»Рё)")
+        self.refresh_btn.setText("в†»")
         self.refresh_btn.setObjectName("IconButton")
         self.refresh_btn.clicked.connect(self.refresh_all)
         row.addWidget(self.refresh_btn, 0, Qt.AlignCenter)
 
-        self.refresh_profiles_btn = QPushButton("Обновить профили")
+        self.refresh_profiles_btn = QPushButton("РћР±РЅРѕРІРёС‚СЊ РїСЂРѕС„РёР»Рё")
         self.refresh_profiles_btn.setObjectName("SecondaryButton")
-        self.refresh_profiles_btn.setToolTip("Перечитать локальные профили Steam (loginusers.vdf, avatarcache)")
+        self.refresh_profiles_btn.setToolTip("РџРµСЂРµС‡РёС‚Р°С‚СЊ Р»РѕРєР°Р»СЊРЅС‹Рµ РїСЂРѕС„РёР»Рё Steam (loginusers.vdf, avatarcache)")
         self.refresh_profiles_btn.clicked.connect(self.refresh_profiles_only)
         row.addWidget(self.refresh_profiles_btn, 0)
 
-        self.status_label = QLabel("Готово")
+        self.status_label = QLabel("Р“РѕС‚РѕРІРѕ")
         self.status_label.setObjectName("StatusLabel")
         self.status_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         row.addWidget(self.status_label, 2)
@@ -231,18 +231,18 @@ class MainWindow(QMainWindow):
         if detected:
             self.settings_data["steam_path"] = detected
             save_settings(self.settings_data)
-            self.set_status(f"Найден Steam: {detected}")
+            self.set_status(f"РќР°Р№РґРµРЅ Steam: {detected}")
             return
-        self.set_status("Steam не найден")
+        self.set_status("Steam РЅРµ РЅР°Р№РґРµРЅ")
         QMessageBox.information(
             self,
-            "Steam не найден",
-            "Не удалось автоматически определить путь к Steam. Укажите папку Steam вручную.",
+            "Steam РЅРµ РЅР°Р№РґРµРЅ",
+            "РќРµ СѓРґР°Р»РѕСЃСЊ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё РѕРїСЂРµРґРµР»РёС‚СЊ РїСѓС‚СЊ Рє Steam. РЈРєР°Р¶РёС‚Рµ РїР°РїРєСѓ Steam РІСЂСѓС‡РЅСѓСЋ.",
         )
         self.choose_steam_path()
 
     def update_steam_path_label(self) -> None:
-        path = self.settings_data.get("steam_path") or "Не задан"
+        path = self.settings_data.get("steam_path") or "РќРµ Р·Р°РґР°РЅ"
         self.steam_path_label.setText(self._elide_middle(str(path), 60))
         self.steam_path_label.setToolTip(str(path))
 
@@ -286,11 +286,11 @@ class MainWindow(QMainWindow):
         self.refresh_accounts(select_saved=False)
         self.refresh_configs()
         self.refresh_profiles_async(force=True)
-        self.set_status("Обновлено")
+        self.set_status("РћР±РЅРѕРІР»РµРЅРѕ")
 
     def refresh_profiles_only(self) -> None:
         self.refresh_profiles_async(force=True)
-        self.set_status("Профили обновлены")
+        self.set_status("РџСЂРѕС„РёР»Рё РѕР±РЅРѕРІР»РµРЅС‹")
 
     # --- Accounts ---
     def refresh_accounts(self, select_saved: bool = True) -> None:
@@ -299,7 +299,7 @@ class MainWindow(QMainWindow):
         self.account_combo.clear()
         self.accounts = []
         if not steam_path or not Path(steam_path).exists():
-            self.account_combo.addItem("Steam не найден")
+            self.account_combo.addItem("Steam РЅРµ РЅР°Р№РґРµРЅ")
             self.account_combo.setEnabled(False)
             self.account_combo.blockSignals(False)
             return
@@ -308,17 +308,17 @@ class MainWindow(QMainWindow):
             self.accounts = enumerate_accounts(steam_path)
         except Exception as e:
             LOGGER.exception("Failed to enumerate accounts: %s", e)
-            self.set_status("Ошибка сканирования аккаунтов")
+            self.set_status("РћС€РёР±РєР° СЃРєР°РЅРёСЂРѕРІР°РЅРёСЏ Р°РєРєР°СѓРЅС‚РѕРІ")
             self.accounts = []
 
         if not self.accounts:
-            self.account_combo.addItem("Аккаунты Steam не найдены")
+            self.account_combo.addItem("РђРєРєР°СѓРЅС‚С‹ Steam РЅРµ РЅР°Р№РґРµРЅС‹")
             self.account_combo.setEnabled(False)
             self.account_combo.blockSignals(False)
             QMessageBox.information(
                 self,
-                "Аккаунты не найдены",
-                "В папке userdata не найдено ни одного аккаунта. Запустите Steam хотя бы раз.",
+                "РђРєРєР°СѓРЅС‚С‹ РЅРµ РЅР°Р№РґРµРЅС‹",
+                "Р’ РїР°РїРєРµ userdata РЅРµ РЅР°Р№РґРµРЅРѕ РЅРё РѕРґРЅРѕРіРѕ Р°РєРєР°СѓРЅС‚Р°. Р—Р°РїСѓСЃС‚РёС‚Рµ Steam С…РѕС‚СЏ Р±С‹ СЂР°Р·.",
             )
             return
 
@@ -328,7 +328,7 @@ class MainWindow(QMainWindow):
             aid = str(acc["account_id"])
             display_name = aid
             if not acc.get("has_dota", False):
-                display_name += " (нет Dota 2)"
+                display_name += " (РЅРµС‚ Dota 2)"
             self.account_combo.addItem(make_avatar_pixmap(None, name=display_name, account_id=aid), display_name)
             # Qt.UserRole keeps display name for delegate; Qt.UserRole+1 stores numeric account id
             self.account_combo.setItemData(i, display_name, Qt.UserRole)
@@ -367,15 +367,15 @@ class MainWindow(QMainWindow):
             name = prof.get("personaname") or aid
             acc = next((a for a in self.accounts if str(a["account_id"]) == aid), None)
             if acc and not acc.get("has_dota", False):
-                name = f"{name} (нет Dota 2)"
+                name = f"{name} (РЅРµС‚ Dota 2)"
             avatar_path = prof.get("avatar_path")
             source = prof.get("source")
             if source == "loginusers.vdf":
-                tooltip = f"Никнейм: из loginusers.vdf\nAccountID: {aid}"
+                tooltip = f"РќРёРєРЅРµР№Рј: РёР· loginusers.vdf\nAccountID: {aid}"
             elif source == "localconfig.vdf":
-                tooltip = f"Никнейм: из localconfig.vdf\nAccountID: {aid}"
+                tooltip = f"РќРёРєРЅРµР№Рј: РёР· localconfig.vdf\nAccountID: {aid}"
             else:
-                tooltip = f"Никнейм: не найдено (используется AccountID)\nAccountID: {aid}"
+                tooltip = f"РќРёРєРЅРµР№Рј: РЅРµ РЅР°Р№РґРµРЅРѕ (РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ AccountID)\nAccountID: {aid}"
             self.account_combo.setItemIcon(i, QIcon(make_avatar_pixmap(avatar_path, 32, 8, name=name, account_id=aid)))
             self.account_combo.setItemData(i, name, Qt.UserRole)
             self.account_combo.setItemData(i, aid, Qt.UserRole + 1)
@@ -407,7 +407,7 @@ class MainWindow(QMainWindow):
 
     def on_profiles_error(self, message: str, details: str) -> None:
         LOGGER.warning("Local profile load error: %s\n%s", message, details)
-        self.set_status("Ошибка чтения профилей Steam")
+        self.set_status("РћС€РёР±РєР° С‡С‚РµРЅРёСЏ РїСЂРѕС„РёР»РµР№ Steam")
 
     def on_account_changed(self, index: int) -> None:
         aid = self.get_selected_account_id()
@@ -437,8 +437,8 @@ class MainWindow(QMainWindow):
                 configs = list_configs(configs_dir)
         except Exception as e:
             LOGGER.exception("Failed to list configs: %s", e)
-            self.set_status("Ошибка чтения конфигов")
-            QMessageBox.warning(self, "Ошибка", f"Не удалось прочитать список конфигов: {e}")
+            self.set_status("РћС€РёР±РєР° С‡С‚РµРЅРёСЏ РєРѕРЅС„РёРіРѕРІ")
+            QMessageBox.warning(self, "РћС€РёР±РєР°", f"РќРµ СѓРґР°Р»РѕСЃСЊ РїСЂРѕС‡РёС‚Р°С‚СЊ СЃРїРёСЃРѕРє РєРѕРЅС„РёРіРѕРІ: {e}")
             configs = []
 
         if not configs:
@@ -458,7 +458,7 @@ class MainWindow(QMainWindow):
     # --- Actions ---
     def choose_steam_path(self) -> None:
         current = self.settings_data.get("steam_path") or str(get_base_dir())
-        path = QFileDialog.getExistingDirectory(self, "Выберите папку Steam", current)
+        path = QFileDialog.getExistingDirectory(self, "Р’С‹Р±РµСЂРёС‚Рµ РїР°РїРєСѓ Steam", current)
         if not path:
             return
         self.settings_data["steam_path"] = path
@@ -467,7 +467,7 @@ class MainWindow(QMainWindow):
         self.refresh_accounts(select_saved=True)
         self.refresh_configs()
         self.refresh_profiles_async(force=False)
-        self.set_status("Путь к Steam обновлён")
+        self.set_status("РџСѓС‚СЊ Рє Steam РѕР±РЅРѕРІР»С‘РЅ")
 
     def open_settings_dialog(self) -> None:
         dlg = SettingsDialog(self.settings_data, self)
@@ -479,16 +479,16 @@ class MainWindow(QMainWindow):
             self.refresh_accounts(select_saved=True)
             self.refresh_configs()
             self.refresh_profiles_async(force=False)
-            self.set_status("Настройки сохранены")
+            self.set_status("РќР°СЃС‚СЂРѕР№РєРё СЃРѕС…СЂР°РЅРµРЅС‹")
 
     def validate_ready_for_ops(self) -> Optional[tuple[str, str]]:
         steam_path = self.settings_data.get("steam_path") or ""
         if not steam_path or not Path(steam_path).exists():
-            QMessageBox.warning(self, "Ошибка", "Путь к Steam не задан или не найден.")
+            QMessageBox.warning(self, "РћС€РёР±РєР°", "РџСѓС‚СЊ Рє Steam РЅРµ Р·Р°РґР°РЅ РёР»Рё РЅРµ РЅР°Р№РґРµРЅ.")
             return None
         account_id = self.get_selected_account_id()
         if not account_id:
-            QMessageBox.warning(self, "Ошибка", "Не выбран аккаунт Steam.")
+            QMessageBox.warning(self, "РћС€РёР±РєР°", "РќРµ РІС‹Р±СЂР°РЅ Р°РєРєР°СѓРЅС‚ Steam.")
             return None
         return steam_path, account_id
 
@@ -498,7 +498,7 @@ class MainWindow(QMainWindow):
             return
         steam_path, account_id = ready
         configs_dir = self.get_configs_dir()
-        name, ok = QInputDialog.getText(self, "Сохранить текущий конфиг", "Введите имя конфига:")
+        name, ok = QInputDialog.getText(self, "РЎРѕС…СЂР°РЅРёС‚СЊ С‚РµРєСѓС‰РёР№ РєРѕРЅС„РёРі", "Р’РІРµРґРёС‚Рµ РёРјСЏ РєРѕРЅС„РёРіР°:")
         if not ok:
             return
         name = (name or "").strip()
@@ -506,7 +506,7 @@ class MainWindow(QMainWindow):
         from configs import validate_config_name
         valid, msg = validate_config_name(name, configs_dir)
         if not valid:
-            QMessageBox.warning(self, "Некорректное имя", msg)
+            QMessageBox.warning(self, "РќРµРєРѕСЂСЂРµРєС‚РЅРѕРµ РёРјСЏ", msg)
             return
 
         self.start_worker(
@@ -515,8 +515,8 @@ class MainWindow(QMainWindow):
             account_id,
             configs_dir,
             name,
-            busy_text="Сохранение конфига...",
-            success_message=f"Конфиг '{name}' сохранён",
+            busy_text="РЎРѕС…СЂР°РЅРµРЅРёРµ РєРѕРЅС„РёРіР°...",
+            success_message=f"РљРѕРЅС„РёРі '{name}' СЃРѕС…СЂР°РЅС‘РЅ",
             on_success=lambda _p: self.refresh_configs(),
         )
 
@@ -528,9 +528,9 @@ class MainWindow(QMainWindow):
         cfg_name = Path(config_path).name
         reply = QMessageBox.question(
             self,
-            "Применить конфиг",
-            f"Применить конфиг '{cfg_name}' для выбранного аккаунта?\n\n"
-            f"Текущие файлы в userdata\\{account_id}\\570 будут заменены.",
+            "РџСЂРёРјРµРЅРёС‚СЊ РєРѕРЅС„РёРі",
+            f"РџСЂРёРјРµРЅРёС‚СЊ РєРѕРЅС„РёРі '{cfg_name}' РґР»СЏ РІС‹Р±СЂР°РЅРЅРѕРіРѕ Р°РєРєР°СѓРЅС‚Р°?\n\n"
+            f"РўРµРєСѓС‰РёРµ С„Р°Р№Р»С‹ РІ userdata\\{account_id}\\570 Р±СѓРґСѓС‚ Р·Р°РјРµРЅРµРЅС‹.",
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No,
         )
@@ -541,16 +541,16 @@ class MainWindow(QMainWindow):
             config_path,
             steam_path,
             account_id,
-            busy_text=f"Применение '{cfg_name}'...",
-            success_message=f"Конфиг '{cfg_name}' применён",
+            busy_text=f"РџСЂРёРјРµРЅРµРЅРёРµ '{cfg_name}'...",
+            success_message=f"РљРѕРЅС„РёРі '{cfg_name}' РїСЂРёРјРµРЅС‘РЅ",
         )
 
     def confirm_delete_config(self, config_path: str) -> None:
         name = Path(config_path).name
         reply = QMessageBox.question(
             self,
-            "Удалить конфиг",
-            f"Удалить конфиг '{name}'?\nЭто действие нельзя отменить.",
+            "РЈРґР°Р»РёС‚СЊ РєРѕРЅС„РёРі",
+            f"РЈРґР°Р»РёС‚СЊ РєРѕРЅС„РёРі '{name}'?\nР­С‚Рѕ РґРµР№СЃС‚РІРёРµ РЅРµР»СЊР·СЏ РѕС‚РјРµРЅРёС‚СЊ.",
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No,
         )
@@ -558,17 +558,17 @@ class MainWindow(QMainWindow):
             return
         try:
             delete_config(config_path)
-            self.set_status(f"Конфиг '{name}' удалён")
+            self.set_status(f"РљРѕРЅС„РёРі '{name}' СѓРґР°Р»С‘РЅ")
             self.refresh_configs()
         except Exception as e:
             LOGGER.exception("Failed to delete config %s: %s", config_path, e)
-            QMessageBox.critical(self, "Ошибка", f"Не удалось удалить конфиг: {e}")
+            QMessageBox.critical(self, "РћС€РёР±РєР°", f"РќРµ СѓРґР°Р»РѕСЃСЊ СѓРґР°Р»РёС‚СЊ РєРѕРЅС„РёРі: {e}")
 
     def open_config_folder(self, config_path: str) -> None:
         try:
             open_in_explorer(config_path)
         except Exception as e:
-            QMessageBox.warning(self, "Ошибка", f"Не удалось открыть папку: {e}")
+            QMessageBox.warning(self, "РћС€РёР±РєР°", f"РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РєСЂС‹С‚СЊ РїР°РїРєСѓ: {e}")
 
     # --- Worker/progress handling ---
     def set_busy(self, busy: bool, text: str = "") -> None:
@@ -606,7 +606,7 @@ class MainWindow(QMainWindow):
 
     def start_worker(self, fn, *args, busy_text: str, success_message: str, on_success=None) -> None:
         if self.current_copy_worker and self.current_copy_worker.isRunning():
-            QMessageBox.information(self, "Операция выполняется", "Дождитесь завершения текущей операции.")
+            QMessageBox.information(self, "РћРїРµСЂР°С†РёСЏ РІС‹РїРѕР»РЅСЏРµС‚СЃСЏ", "Р”РѕР¶РґРёС‚РµСЃСЊ Р·Р°РІРµСЂС€РµРЅРёСЏ С‚РµРєСѓС‰РµР№ РѕРїРµСЂР°С†РёРё.")
             return
         worker = CopyWorker(fn, *args)
         self.current_copy_worker = worker
@@ -625,7 +625,7 @@ class MainWindow(QMainWindow):
             self.set_busy(False)
             self.current_copy_worker = None
             self.set_status(success_message)
-            QMessageBox.information(self, "Готово", success_message)
+            QMessageBox.information(self, "Р“РѕС‚РѕРІРѕ", success_message)
             if on_success:
                 try:
                     on_success(result)
@@ -636,8 +636,8 @@ class MainWindow(QMainWindow):
             self.set_busy(False)
             self.current_copy_worker = None
             LOGGER.error("Operation failed: %s\n%s", message, details)
-            self.set_status("Ошибка")
-            QMessageBox.critical(self, "Ошибка", str(message))
+            self.set_status("РћС€РёР±РєР°")
+            QMessageBox.critical(self, "РћС€РёР±РєР°", str(message))
 
         worker.progress.connect(on_progress)
         worker.finished.connect(on_finished)
@@ -647,3 +647,4 @@ class MainWindow(QMainWindow):
     def set_status(self, text: str) -> None:
         self.status_label.setText(text)
         self.status_label.setToolTip(text)
+

@@ -1,4 +1,4 @@
-"""Application settings management."""
+﻿"""Application settings management."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict
 
-APP_NAME = "Dota 2 Config Switcher"
+APP_NAME = "DotaConfigSwitcher"
 SETTINGS_FILENAME = "settings.json"
 CACHE_DIRNAME = "cache"
 AVATAR_CACHE_DIRNAME = "avatars"
@@ -93,4 +93,5 @@ def save_settings(settings: Dict[str, Any]) -> None:
     with tmp_path.open("w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     os.replace(tmp_path, path)
+
 
