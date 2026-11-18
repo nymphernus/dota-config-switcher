@@ -160,11 +160,17 @@ class MainWindow(QMainWindow):
         row.addWidget(self.save_btn, 2)
 
         self.refresh_btn = QToolButton()
-        self.refresh_btn.setToolTip("Обновить")
+        self.refresh_btn.setToolTip("Обновить (конфиги, аккаунты, профили)")
         self.refresh_btn.setText("↻")
         self.refresh_btn.setObjectName("IconButton")
         self.refresh_btn.clicked.connect(self.refresh_all)
         row.addWidget(self.refresh_btn, 0, Qt.AlignCenter)
+
+        self.refresh_profiles_btn = QPushButton("Обновить профили")
+        self.refresh_profiles_btn.setObjectName("SecondaryButton")
+        self.refresh_profiles_btn.setToolTip("Перечитать локальные профили Steam (loginusers.vdf, avatarcache)")
+        self.refresh_profiles_btn.clicked.connect(self.refresh_profiles_only)
+        row.addWidget(self.refresh_profiles_btn, 0)
 
         self.status_label = QLabel("Готово")
         self.status_label.setObjectName("StatusLabel")
@@ -259,8 +265,12 @@ class MainWindow(QMainWindow):
     def refresh_all(self) -> None:
         self.refresh_accounts(select_saved=False)
         self.refresh_configs()
-        self.refresh_profiles_async(force=False)
+        self.refresh_profiles_async(force=True)
         self.set_status("Обновлено")
+
+    def refresh_profiles_only(self) -> None:
+        self.refresh_profiles_async(force=True)
+        self.set_status("Профили обновлены")
 
     # --- Accounts ---
     def refresh_accounts(self, select_saved: bool = True) -> None:
@@ -535,7 +545,16 @@ class MainWindow(QMainWindow):
 
     # --- Worker/progress handling ---
     def set_busy(self, busy: bool, text: str = "") -> None:
-        for w in [self.save_btn, self.refresh_btn, self.empty_save_btn, self.change_path_btn, self.settings_btn, self.account_combo]:
+        controls = [
+            self.save_btn,
+            self.refresh_btn,
+            self.refresh_profiles_btn,
+            self.empty_save_btn,
+            self.change_path_btn,
+            self.settings_btn,
+            self.account_combo,
+        ]
+        for w in controls:
             w.setDisabled(busy)
         # Disable apply/more buttons on cards
         for i in range(self.cards_layout.count() - 1):

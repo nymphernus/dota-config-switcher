@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-import webbrowser
 from pathlib import Path
 from typing import Any, Dict
 
-from PySide6.QtCore import Qt, QUrl
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QCheckBox,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
@@ -23,15 +20,12 @@ from PySide6.QtWidgets import (
 )
 
 
-STEAM_API_KEY_URL = "https://steamcommunity.com/dev/apikey"
-
-
 class SettingsDialog(QDialog):
     def __init__(self, settings: Dict[str, Any], parent=None):
         super().__init__(parent)
         self.setWindowTitle("Настройки")
         self.setModal(True)
-        self.resize(500, 400)
+        self.resize(500, 260)
         self._settings = dict(settings)
 
         self._build_ui()
@@ -62,23 +56,6 @@ class SettingsDialog(QDialog):
         steam_wrap.setLayout(steam_row)
         form.addRow("Путь к Steam:", steam_wrap)
 
-        # API key
-        self.api_key_edit = QLineEdit()
-        self.api_key_edit.setPlaceholderText("Вставьте Steam Web API ключ (необязательно)")
-        self.api_key_edit.setEchoMode(QLineEdit.Password)
-        api_link = QLabel(f'<a href="{STEAM_API_KEY_URL}">Получить ключ</a>')
-        api_link.setTextInteractionFlags(Qt.TextBrowserInteraction)
-        api_link.setOpenExternalLinks(False)
-        api_link.linkActivated.connect(self.open_api_key_link)
-        api_row = QVBoxLayout()
-        api_row.setContentsMargins(0, 0, 0, 0)
-        api_row.setSpacing(4)
-        api_row.addWidget(self.api_key_edit)
-        api_row.addWidget(api_link)
-        api_wrap = QWidget()
-        api_wrap.setLayout(api_row)
-        form.addRow("Steam API-ключ:", api_wrap)
-
         # Configs dir
         self.configs_dir_edit = QLineEdit()
         configs_browse = QPushButton("Обзор...")
@@ -92,9 +69,10 @@ class SettingsDialog(QDialog):
         configs_wrap.setLayout(configs_row)
         form.addRow("Папка конфигов:", configs_wrap)
 
-        # Checkbox
-        self.check_avatars_checkbox = QCheckBox("Проверять обновления аватарок при запуске")
-        form.addRow("", self.check_avatars_checkbox)
+        hint = QLabel("Никнеймы и аватарки читаются из локальных файлов Steam (без интернета и API-ключа).")
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: #9aa3b2; font-size: 12px;")
+        form.addRow("", hint)
 
         layout.addLayout(form)
         layout.addStretch(1)
@@ -108,9 +86,7 @@ class SettingsDialog(QDialog):
 
     def _load_values(self) -> None:
         self.steam_path_edit.setText(str(self._settings.get("steam_path") or ""))
-        self.api_key_edit.setText(str(self._settings.get("api_key") or ""))
         self.configs_dir_edit.setText(str(self._settings.get("configs_dir") or ""))
-        self.check_avatars_checkbox.setChecked(bool(self._settings.get("check_avatar_updates", True)))
 
     def browse_steam_path(self) -> None:
         current = self.steam_path_edit.text().strip() or str(Path.home())
@@ -124,20 +100,12 @@ class SettingsDialog(QDialog):
         if path:
             self.configs_dir_edit.setText(path)
 
-    def open_api_key_link(self, url: str) -> None:
-        try:
-            QDesktopServices.openUrl(QUrl(url))
-        except Exception:
-            try:
-                webbrowser.open(url)
-            except Exception:
-                pass
-
     def get_settings(self) -> Dict[str, Any]:
         data = dict(self._settings)
         data["steam_path"] = self.steam_path_edit.text().strip()
-        data["api_key"] = self.api_key_edit.text().strip()
         data["configs_dir"] = self.configs_dir_edit.text().strip()
-        data["check_avatar_updates"] = self.check_avatars_checkbox.isChecked()
+        # Drop legacy keys if present in old settings dict
+        data.pop("api_key", None)
+        data.pop("check_avatar_updates", None)
         return data
 

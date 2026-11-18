@@ -12,7 +12,6 @@ APP_NAME = "Dota 2 Config Switcher"
 SETTINGS_FILENAME = "settings.json"
 CACHE_DIRNAME = "cache"
 AVATAR_CACHE_DIRNAME = "avatars"
-PROFILE_CACHE_FILENAME = "profiles.json"
 LOG_FILENAME = "app.log"
 
 
@@ -47,10 +46,6 @@ def get_avatar_cache_dir() -> Path:
     return path
 
 
-def get_profile_cache_path() -> Path:
-    return get_cache_dir() / PROFILE_CACHE_FILENAME
-
-
 def get_log_path() -> Path:
     return get_base_dir() / LOG_FILENAME
 
@@ -59,9 +54,7 @@ def default_settings() -> Dict[str, Any]:
     return {
         "steam_path": "",
         "selected_account_id": "",
-        "api_key": "",
         "configs_dir": str(get_default_configs_dir()),
-        "check_avatar_updates": True,
     }
 
 
@@ -83,9 +76,8 @@ def load_settings() -> Dict[str, Any]:
     # Normalize types/values lightly
     settings["steam_path"] = str(settings.get("steam_path") or "")
     settings["selected_account_id"] = str(settings.get("selected_account_id") or "")
-    settings["api_key"] = str(settings.get("api_key") or "")
     settings["configs_dir"] = str(settings.get("configs_dir") or get_default_configs_dir())
-    settings["check_avatar_updates"] = bool(settings.get("check_avatar_updates", True))
+    # Ignore legacy keys from older versions (e.g. api_key, check_avatar_updates)
     return settings
 
 
@@ -93,11 +85,10 @@ def save_settings(settings: Dict[str, Any]) -> None:
     path = get_settings_path()
     data = default_settings()
     if settings:
-        data.update({k: settings.get(k, v) for k, v in data.items()})
-        # Preserve any unknown keys? probably not necessary, but keep simple
-        for k, v in settings.items():
-            if k not in data:
-                data[k] = v
+        for k in data.keys():
+            if k in settings:
+                data[k] = settings[k]
+    # Only persist known settings (drops legacy keys like api_key)
     tmp_path = path.with_suffix(".tmp")
     with tmp_path.open("w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
