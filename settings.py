@@ -1,4 +1,4 @@
-﻿"""Application settings management."""
+"""Application settings management."""
 
 from __future__ import annotations
 

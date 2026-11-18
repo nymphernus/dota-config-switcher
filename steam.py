@@ -1,4 +1,4 @@
-﻿"""Steam detection, Steam account enumeration, and local profile reading."""
+"""Steam detection, Steam account enumeration, and local profile reading."""
 
 from __future__ import annotations
 

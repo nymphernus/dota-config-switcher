@@ -3,7 +3,13 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
+
+if sys.stdout is not None:
+    sys.stdout.reconfigure(encoding="utf-8")
+if sys.stderr is not None:
+    sys.stderr.reconfigure(encoding="utf-8")
 from logging.handlers import RotatingFileHandler
 
 from PySide6.QtCore import Qt
