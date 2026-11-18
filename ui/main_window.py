@@ -299,7 +299,7 @@ class MainWindow(QMainWindow):
             display_name = aid
             if not acc.get("has_dota", False):
                 display_name += " (нет Dota 2)"
-            self.account_combo.addItem(make_avatar_pixmap(None), display_name, aid)
+            self.account_combo.addItem(make_avatar_pixmap(None, name=display_name, account_id=aid), display_name, aid)
             self.account_combo.setItemData(i, display_name, Qt.UserRole)
             self.account_combo.setItemData(i, aid, Qt.UserRole + 1)
             self.account_combo.setItemData(i, None, Qt.UserRole + 2)
@@ -339,7 +339,7 @@ class MainWindow(QMainWindow):
                 tooltip = f"Никнейм: из localconfig.vdf\nAccountID: {aid}"
             else:
                 tooltip = f"Никнейм: не найдено (используется AccountID)\nAccountID: {aid}"
-            self.account_combo.setItemIcon(i, QIcon(make_avatar_pixmap(avatar_path, 32, 8)))
+            self.account_combo.setItemIcon(i, QIcon(make_avatar_pixmap(avatar_path, 32, 8, name=name, account_id=aid)))
             self.account_combo.setItemData(i, name, Qt.UserRole)
             self.account_combo.setItemData(i, aid, Qt.UserRole + 1)
             self.account_combo.setItemData(i, avatar_path, Qt.UserRole + 2)

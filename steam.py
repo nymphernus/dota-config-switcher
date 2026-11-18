@@ -19,7 +19,7 @@ except Exception:  # pragma: no cover - non-Windows fallback
 
 import requests
 
-from settings import get_avatar_cache_dir, get_profile_cache_path
+from settings import get_avatar_cache_dir, get_profile_cache_path, get_cache_dir
 
 LOGGER = logging.getLogger(__name__)
 
@@ -424,6 +424,161 @@ def get_local_profile_info(steam_path: str | Path, account_id: str | int) -> Dic
     return {"persona_name": None, "account_name": lu.get("account_name") if lu else None, "source": "none"}
 
 
+def _is_image_file(path: Path) -> bool:
+    try:
+        with path.open("rb") as f:
+            head = f.read(16)
+        if head.startswith(b"\x89PNG\r\n\x1a\n"):
+            return True
+        if head.startswith(b"\xff\xd8\xff"):
+            return True
+        if head.startswith(b"RIFF") and b"WEBP" in head:
+            return True
+        if head.startswith(b"BM"):
+            return True
+        return False
+    except Exception:
+        return False
+
+
+def find_avatarcache_image(steam_path: str | Path, account_id: int, steam_id64: int) -> Optional[Path]:
+    """Best-effort search for an avatar image in Steam's avatarcache."""
+    cache_dir = Path(_normalize_path(str(steam_path))) / "config" / "avatarcache"
+    if not cache_dir.exists() or not cache_dir.is_dir():
+        return None
+
+    sid_str = str(steam_id64)
+    aid_str = str(account_id)
+    candidates: List[Path] = []
+    try:
+        # Prefer filename matches
+        for p in cache_dir.iterdir():
+            if not p.is_file():
+                continue
+            name = p.name.lower()
+            if sid_str in name or aid_str in name:
+                if _is_image_file(p):
+                    return p
+                candidates.append(p)
+        # Fallback: if exactly one image file exists, can't reliably map to account -> skip
+        # (best-effort without false association). Also try files that are images anyway? no mapping.
+    except Exception as e:
+        LOGGER.warning("Failed to scan avatarcache: %s", e)
+        return None
+
+    # If filename matched but signature check failed above (e.g. extensionless), try PIL open lazily later
+    for p in candidates:
+        try:
+            from PIL import Image  # type: ignore
+            with Image.open(p) as im:
+                im.verify()
+            return p
+        except Exception:
+            continue
+    return None
+
+
+def _deterministic_avatar_color(account_id: int) -> Tuple[int, int, int]:
+    # Pleasant deterministic palette-ish color from account id
+    h = (account_id * 2654435761) & 0xFFFFFFFF
+    r = 60 + (h & 0x7F)
+    g = 60 + ((h >> 8) & 0x7F)
+    b = 60 + ((h >> 16) & 0x7F)
+    return (r, g, b)
+
+
+def generate_fallback_avatar(account_id: int, persona_name: str, out_path: Path, size: int = 128) -> Optional[Path]:
+    try:
+        from PIL import Image, ImageDraw, ImageFont  # type: ignore
+    except Exception as e:
+        LOGGER.warning("Pillow is not available for fallback avatar generation: %s", e)
+        return None
+
+    try:
+        name = (persona_name or "").strip()
+        letter = "?"
+        if name:
+            # Prefer first alphabetic/digit char
+            for ch in name:
+                if ch.strip():
+                    letter = ch.upper()
+                    break
+        bg = _deterministic_avatar_color(int(account_id))
+        img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        draw.ellipse((0, 0, size - 1, size - 1), fill=bg + (255,))
+
+        # Font
+        font = None
+        font_size = int(size * 0.5)
+        for font_name in ("segoeui.ttf", "arial.ttf", "DejaVuSans.ttf"):
+            try:
+                font = ImageFont.truetype(font_name, font_size)
+                break
+            except Exception:
+                continue
+        if font is None:
+            font = ImageFont.load_default()
+
+        text = letter
+        try:
+            bbox = draw.textbbox((0, 0), text, font=font)
+            tw = bbox[2] - bbox[0]
+            th = bbox[3] - bbox[1]
+        except Exception:
+            tw, th = draw.textsize(text, font=font)  # type: ignore[attr-defined]
+        x = (size - tw) / 2
+        y = (size - th) / 2 - size * 0.04
+        draw.text((x, y), text, fill=(245, 247, 255, 255), font=font)
+
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = out_path.with_suffix(".tmp.png")
+        img.save(tmp, format="PNG")
+        os.replace(tmp, out_path)
+        return out_path
+    except Exception as e:
+        LOGGER.warning("Failed to generate fallback avatar for %s: %s", account_id, e)
+        return None
+
+
+def resolve_avatar_path(steam_path: str | Path, account_id: int, steam_id64: int, persona_name: str) -> Optional[str]:
+    """Resolve local avatar path (cached). Creates/updates cache from avatarcache or fallback."""
+    cache_dir = get_avatar_cache_dir()
+    cached_path = cache_dir / f"{account_id}.png"
+
+    src = find_avatarcache_image(steam_path, account_id, steam_id64)
+    if src and src.exists():
+        try:
+            src_mtime = src.stat().st_mtime
+            need_update = True
+            if cached_path.exists():
+                try:
+                    need_update = src_mtime > cached_path.stat().st_mtime
+                except Exception:
+                    need_update = True
+            if need_update:
+                try:
+                    from PIL import Image  # type: ignore
+                    with Image.open(src) as im:
+                        im = im.convert("RGBA")
+                        tmp = cached_path.with_suffix(".tmp.png")
+                        im.save(tmp, format="PNG")
+                    os.replace(tmp, cached_path)
+                except Exception as e:
+                    # If PIL can't read, try raw copy only if already png-like? otherwise fallback
+                    LOGGER.warning("Failed to convert avatarcache image %s: %s", src, e)
+            if cached_path.exists():
+                return str(cached_path)
+        except Exception as e:
+            LOGGER.warning("Avatar cache update failed for %s: %s", account_id, e)
+
+    # Fallback generated avatar (refresh each time in case name initial changes)
+    fb = generate_fallback_avatar(account_id, persona_name, cached_path)
+    if fb and fb.exists():
+        return str(fb)
+    return str(cached_path) if cached_path.exists() else None
+
+
 def get_local_profiles(steam_path: str | Path, account_ids: List[str | int]) -> Dict[str, Dict[str, Any]]:
     """Build local profile data for accounts (no network).
 
@@ -472,10 +627,13 @@ def get_local_profiles(steam_path: str | Path, account_ids: List[str | int]) -> 
         if not persona:
             persona = aid_str  # show AccountID as nickname fallback per requirements
 
+        steam_id64 = aid_int + STEAMID64_OFFSET
+        avatar_path = resolve_avatar_path(steam_path, aid_int, steam_id64, persona)
+
         result[aid_str] = {
             "personaname": persona,
             "account_name": account_name,
-            "avatar_path": None,  # added in later step
+            "avatar_path": avatar_path,
             "source": source,
         }
     return result

@@ -23,20 +23,38 @@ from PySide6.QtWidgets import (
 )
 
 
-def make_avatar_pixmap(path: Optional[str], size: int = 32, radius: int = 8) -> QPixmap:
+def _fallback_avatar_color(account_id: Optional[int | str]) -> QColor:
+    try:
+        aid = int(account_id) if account_id is not None and str(account_id).strip() != "" else 0
+    except Exception:
+        aid = 0
+    h = (aid * 2654435761) & 0xFFFFFFFF
+    r = 60 + (h & 0x7F)
+    g = 60 + ((h >> 8) & 0x7F)
+    b = 60 + ((h >> 16) & 0x7F)
+    return QColor(r, g, b)
+
+
+def make_avatar_pixmap(
+    path: Optional[str],
+    size: int = 32,
+    radius: int = 8,
+    name: Optional[str] = None,
+    account_id: Optional[int | str] = None,
+) -> QPixmap:
     pix = QPixmap(size, size)
     pix.fill(Qt.transparent)
     painter = QPainter(pix)
     painter.setRenderHint(QPainter.Antialiasing, True)
     rect = QRect(0, 0, size, size)
-    path_clip = QPainterPath()
-    path_clip.addRoundedRect(rect, radius, radius)
-    painter.setClipPath(path_clip)
 
     loaded = False
     if path and os.path.exists(path):
         src = QPixmap(path)
         if not src.isNull():
+            path_clip = QPainterPath()
+            path_clip.addRoundedRect(rect, radius, radius)
+            painter.setClipPath(path_clip)
             scaled = src.scaled(size, size, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
             x = (scaled.width() - size) // 2
             y = (scaled.height() - size) // 2
@@ -44,13 +62,28 @@ def make_avatar_pixmap(path: Optional[str], size: int = 32, radius: int = 8) -> 
             loaded = True
 
     if not loaded:
-        painter.fillRect(rect, QColor("#3a3a4a"))
-        painter.setPen(QColor("#cfd6e6"))
+        # Fallback: circle with first letter and deterministic color
+        painter.setClipping(False)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(_fallback_avatar_color(account_id))
+        painter.drawEllipse(rect.adjusted(1, 1, -1, -1))
+
+        letter = "?"
+        text_source = (name or "").strip()
+        if text_source:
+            for ch in text_source:
+                if ch.strip():
+                    letter = ch.upper()
+                    break
+        elif account_id is not None and str(account_id).strip():
+            letter = str(account_id).strip()[0]
+
+        painter.setPen(QColor("#f5f7ff"))
         font = QFont()
         font.setBold(True)
-        font.setPointSize(max(8, size // 3))
+        font.setPointSize(max(8, int(size * 0.45)))
         painter.setFont(font)
-        painter.drawText(rect, Qt.AlignCenter, "?")
+        painter.drawText(rect, Qt.AlignCenter, letter)
 
     painter.end()
     return pix
@@ -84,15 +117,14 @@ class AccountComboDelegate(QStyledItemDelegate):
 
         rect = opt.rect.adjusted(self.padding, 4, -self.padding, -4)
         avatar_path = index.data(Qt.UserRole + 2)
-        avatar = make_avatar_pixmap(avatar_path, self.avatar_size, 8)
+        name = index.data(Qt.UserRole) or index.data(Qt.DisplayRole) or ""
+        account_id = index.data(Qt.UserRole + 1) or ""
+        avatar = make_avatar_pixmap(avatar_path, self.avatar_size, 8, name=str(name), account_id=account_id)
         avatar_y = rect.y() + (rect.height() - self.avatar_size) // 2
         painter.drawPixmap(rect.x(), avatar_y, avatar)
 
         text_x = rect.x() + self.avatar_size + 10
         text_rect = QRect(text_x, rect.y(), rect.width() - self.avatar_size - 10, rect.height())
-
-        name = index.data(Qt.UserRole) or index.data(Qt.DisplayRole) or ""
-        account_id = index.data(Qt.UserRole + 1) or ""
         name_font = QFont(opt.font)
         name_font.setPointSize(10)
         name_font.setBold(True)
