@@ -37,6 +37,7 @@ from configs import (
     list_configs,
     open_in_explorer,
     save_current_config,
+    scan_config_details,
     scan_importable_configs,
     validate_config_name_format,
 )
@@ -596,10 +597,11 @@ class MainWindow(QMainWindow):
         self.empty_state.setVisible(False)
         self.scroll.setVisible(True)
         for cfg in configs:
-            card = ConfigCard(cfg.name, cfg.path, cfg.modified_str, cfg.size_str)
+            card = ConfigCard(cfg.name, cfg.path, cfg.modified_date_str, cfg.size_str)
             card.apply_clicked.connect(self.start_apply_config)
             card.delete_clicked.connect(self.confirm_delete_config)
             card.open_clicked.connect(self.open_config_folder)
+            card.details_clicked.connect(self.show_config_details)
             self.cards_layout.insertWidget(self.cards_layout.count() - 1, card)
 
     # --- Actions ---
@@ -719,6 +721,18 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.warning(self, "Ошибка", f"Не удалось открыть папку: {e}")
             self.set_status("Не удалось открыть папку", "error")
+
+    def show_config_details(self, config_path: str) -> None:
+        try:
+            details = scan_config_details(config_path)
+        except Exception as e:
+            LOGGER.exception("Failed to scan config details %s: %s", config_path, e)
+            QMessageBox.warning(self, "Ошибка", f"Не удалось прочитать детали конфига: {e}")
+            return
+
+        from ui.config_details_dialog import ConfigDetailsDialog
+        dlg = ConfigDetailsDialog(Path(config_path).name, details, self)
+        dlg.exec()
 
     def open_import_dialog(self) -> None:
         configs_dir = self.get_configs_dir()
