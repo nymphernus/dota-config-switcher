@@ -605,7 +605,7 @@ class MainWindow(QMainWindow):
             new_settings = dlg.get_settings()
             self.settings_data.update(new_settings)
             save_settings(self.settings_data)
-                self.refresh_accounts(select_saved=True)
+            self.refresh_accounts(select_saved=True)
             self.refresh_configs()
             self.refresh_profiles_async(force=True)
             self.set_status("Настройки сохранены", "ok")
@@ -738,11 +738,8 @@ class MainWindow(QMainWindow):
         self.tray_menu.clear()
 
         profile_name = self._get_favorite_profile_display_name()
-        title_action = self.tray_menu.addAction(f"Профиль: {profile_name}")
-        title_action.setEnabled(False)
-
-        open_action = self.tray_menu.addAction("Открыть приложение")
-        open_action.triggered.connect(self.show_from_tray)
+        profile_action = self.tray_menu.addAction(f"???????: {profile_name}")
+        profile_action.triggered.connect(self.show_from_tray)
         self.tray_menu.addSeparator()
 
         configs = list(self.configs_cache) if hasattr(self, "configs_cache") else []
@@ -751,11 +748,11 @@ class MainWindow(QMainWindow):
                 act = self.tray_menu.addAction(cfg.name)
                 act.triggered.connect(lambda _checked=False, p=cfg.path, n=cfg.name: self.quick_apply_config_from_tray(p, n))
         else:
-            empty_act = self.tray_menu.addAction("Нет сохранённых конфигов")
+            empty_act = self.tray_menu.addAction("??? ??????????? ????????")
             empty_act.setEnabled(False)
 
         self.tray_menu.addSeparator()
-        quit_action = self.tray_menu.addAction("Выход")
+        quit_action = self.tray_menu.addAction("?????")
         quit_action.triggered.connect(self.quit_from_tray)
 
     def _update_tray_tooltip(self) -> None:
