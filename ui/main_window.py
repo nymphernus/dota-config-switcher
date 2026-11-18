@@ -255,12 +255,32 @@ class MainWindow(QMainWindow):
         right = keep - left
         return text[:left] + "..." + text[-right:]
 
+    @staticmethod
+    def _sanitize_account_id(value: Any) -> Optional[str]:
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text:
+            return None
+        if text.isdigit():
+            return text
+        # Recover from corrupted values like "SteamID: 123" or repeated prefixes
+        import re
+        m = re.findall(r"\d+", text)
+        if m:
+            # Prefer the longest numeric token (account id), usually last/unique
+            return max(m, key=len)
+        return None
+
     def get_selected_account_id(self) -> Optional[str]:
         idx = self.account_combo.currentIndex()
         if idx < 0:
             return None
-        val = self.account_combo.itemData(idx)
-        return str(val) if val else None
+        val = self.account_combo.itemData(idx, Qt.UserRole + 1)
+        if not val:
+            val = self.account_combo.itemData(idx)
+        aid = self._sanitize_account_id(val)
+        return aid
 
     def refresh_all(self) -> None:
         self.refresh_accounts(select_saved=False)
@@ -302,14 +322,15 @@ class MainWindow(QMainWindow):
             )
             return
 
-        selected_id = str(self.settings_data.get("selected_account_id") or "")
+        selected_id = self._sanitize_account_id(self.settings_data.get("selected_account_id")) or ""
         selected_index = 0
         for i, acc in enumerate(self.accounts):
             aid = str(acc["account_id"])
             display_name = aid
             if not acc.get("has_dota", False):
                 display_name += " (нет Dota 2)"
-            self.account_combo.addItem(make_avatar_pixmap(None, name=display_name, account_id=aid), display_name, aid)
+            self.account_combo.addItem(make_avatar_pixmap(None, name=display_name, account_id=aid), display_name)
+            # Qt.UserRole keeps display name for delegate; Qt.UserRole+1 stores numeric account id
             self.account_combo.setItemData(i, display_name, Qt.UserRole)
             self.account_combo.setItemData(i, aid, Qt.UserRole + 1)
             self.account_combo.setItemData(i, None, Qt.UserRole + 2)
@@ -325,6 +346,10 @@ class MainWindow(QMainWindow):
             self.settings_data["selected_account_id"] = str(self.accounts[0]["account_id"])
             save_settings(self.settings_data)
             selected_index = 0
+        elif selected_id and self.settings_data.get("selected_account_id") != selected_id:
+            # Persist sanitized/corrected value
+            self.settings_data["selected_account_id"] = selected_id
+            save_settings(self.settings_data)
 
         self.account_combo.setCurrentIndex(selected_index)
         self.account_combo.blockSignals(False)
@@ -332,10 +357,12 @@ class MainWindow(QMainWindow):
 
     def update_account_combo_display(self) -> None:
         for i in range(self.account_combo.count()):
-            aid = self.account_combo.itemData(i)
+            aid_raw = self.account_combo.itemData(i, Qt.UserRole + 1)
+            if not aid_raw:
+                aid_raw = self.account_combo.itemData(i)
+            aid = self._sanitize_account_id(aid_raw)
             if not aid:
                 continue
-            aid = str(aid)
             prof = self.profiles.get(aid, {})
             name = prof.get("personaname") or aid
             acc = next((a for a in self.accounts if str(a["account_id"]) == aid), None)
