@@ -738,23 +738,27 @@ class MainWindow(QMainWindow):
         self.tray_menu.clear()
 
         profile_name = self._get_favorite_profile_display_name()
-        profile_action = self.tray_menu.addAction(f"???????: {profile_name}")
+        profile_action = QAction(f"???????: {profile_name}", self.tray_menu)
+        self.tray_menu.addAction(profile_action)
         profile_action.triggered.connect(self.show_from_tray)
         self.tray_menu.addSeparator()
 
         configs = list(self.configs_cache) if hasattr(self, "configs_cache") else []
         if configs:
             for cfg in configs:
-                act = self.tray_menu.addAction(cfg.name)
+                act = QAction(cfg.name, self.tray_menu)
+                self.tray_menu.addAction(act)
                 act.triggered.connect(
                     lambda _checked=False, p=cfg.path, n=cfg.name: self.quick_apply_config_from_tray(p, n)
                 )
         else:
-            empty_act = self.tray_menu.addAction("??? ??????????? ????????")
+            empty_act = QAction("??? ??????????? ????????", self.tray_menu)
+            self.tray_menu.addAction(empty_act)
             empty_act.setEnabled(False)
 
         self.tray_menu.addSeparator()
-        quit_action = self.tray_menu.addAction("?????")
+        quit_action = QAction("?????", self.tray_menu)
+        self.tray_menu.addAction(quit_action)
         quit_action.triggered.connect(self.quit_from_tray)
 
 

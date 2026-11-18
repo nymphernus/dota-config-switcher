@@ -6,7 +6,7 @@ import os
 from typing import Optional
 
 from PySide6.QtCore import QModelIndex, QRect, QSize, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPainterPath, QPixmap
+from PySide6.QtGui import QAction, QColor, QFont, QIcon, QPainter, QPainterPath, QPixmap
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -203,9 +203,12 @@ class ConfigCard(QFrame):
         self.more_btn.setPopupMode(QToolButton.InstantPopup)
         self.more_btn.setStyleSheet("QToolButton::menu-indicator { image: none; width: 0px; }")
         menu = QMenu(self)
-        act_open = menu.addAction("??????? ?????")
-        act_rename = menu.addAction("?????????????")
-        act_delete = menu.addAction("???????")
+        act_open = QAction("??????? ?????", menu)
+        menu.addAction(act_open)
+        act_rename = QAction("?????????????", menu)
+        menu.addAction(act_rename)
+        act_delete = QAction("???????", menu)
+        menu.addAction(act_delete)
         act_open.triggered.connect(lambda: self.open_clicked.emit(self.config_path))
         act_rename.triggered.connect(lambda: self.rename_clicked.emit(self.config_path))
         act_delete.triggered.connect(lambda: self.delete_clicked.emit(self.config_path))

@@ -5,6 +5,8 @@ from __future__ import annotations
 import logging
 import os
 os.environ["QT_NO_NATIVE_MENUS"] = "1"
+os.environ["LANG"] = "ru_RU.UTF-8"
+os.environ["LC_ALL"] = "ru_RU.UTF-8"
 import sys
 
 if sys.stdout is not None:
@@ -13,8 +15,8 @@ if sys.stderr is not None:
     sys.stderr.reconfigure(encoding="utf-8")
 from logging.handlers import RotatingFileHandler
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QIcon
+from PySide6.QtCore import QLocale, Qt
+from PySide6.QtGui import QFont, QIcon
 from PySide6.QtWidgets import QApplication
 
 from settings import APP_NAME, get_log_path, get_resource_path
@@ -64,6 +66,8 @@ def main() -> int:
 
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
+    QLocale.setDefault(QLocale(QLocale.Language.Russian, QLocale.Country.Russia))
+    app.setFont(QFont("Segoe UI", 10))
     app.setApplicationName(APP_NAME)
     app.setQuitOnLastWindowClosed(False)
 
