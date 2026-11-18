@@ -31,7 +31,7 @@ from PySide6.QtWidgets import (
 
 from configs import ConfigInfo, apply_config, delete_config, format_size, list_configs, open_in_explorer, save_current_config
 from settings import get_base_dir, load_settings, save_settings
-from steam import detect_steam_path, enumerate_accounts, get_account_profiles
+from steam import detect_steam_path, enumerate_accounts, get_local_profiles
 from ui.settings_dialog import SettingsDialog
 from ui.widgets import AccountComboDelegate, ConfigCard, make_avatar_pixmap
 from ui.workers import CopyWorker, FunctionRunnable
@@ -215,7 +215,7 @@ class MainWindow(QMainWindow):
         self.update_steam_path_label()
         self.refresh_accounts(select_saved=True)
         self.refresh_configs()
-        self.refresh_profiles_async(force=bool(self.settings_data.get("check_avatar_updates", True)))
+        self.refresh_profiles_async(force=True)
 
     def ensure_steam_path(self) -> None:
         steam_path = (self.settings_data.get("steam_path") or "").strip()
@@ -296,9 +296,7 @@ class MainWindow(QMainWindow):
         selected_index = 0
         for i, acc in enumerate(self.accounts):
             aid = str(acc["account_id"])
-            label = f"SteamID: {aid}" if not self.settings_data.get("api_key") else aid
-            # Show has_dota hint subtly in tooltip/label maybe not necessary; add marker in name later if no profile
-            display_name = f"{aid}" if self.settings_data.get("api_key") else f"SteamID: {aid}"
+            display_name = aid
             if not acc.get("has_dota", False):
                 display_name += " (нет Dota 2)"
             self.account_combo.addItem(make_avatar_pixmap(None), display_name, aid)
@@ -329,30 +327,38 @@ class MainWindow(QMainWindow):
                 continue
             aid = str(aid)
             prof = self.profiles.get(aid, {})
-            name = prof.get("personaname") or f"SteamID: {aid}"
+            name = prof.get("personaname") or aid
             acc = next((a for a in self.accounts if str(a["account_id"]) == aid), None)
             if acc and not acc.get("has_dota", False):
                 name = f"{name} (нет Dota 2)"
             avatar_path = prof.get("avatar_path")
+            source = prof.get("source")
+            if source == "loginusers.vdf":
+                tooltip = f"Никнейм: из loginusers.vdf\nAccountID: {aid}"
+            elif source == "localconfig.vdf":
+                tooltip = f"Никнейм: из localconfig.vdf\nAccountID: {aid}"
+            else:
+                tooltip = f"Никнейм: не найдено (используется AccountID)\nAccountID: {aid}"
             self.account_combo.setItemIcon(i, QIcon(make_avatar_pixmap(avatar_path, 32, 8)))
             self.account_combo.setItemData(i, name, Qt.UserRole)
             self.account_combo.setItemData(i, aid, Qt.UserRole + 1)
             self.account_combo.setItemData(i, avatar_path, Qt.UserRole + 2)
+            self.account_combo.setItemData(i, tooltip, Qt.ToolTipRole)
             # Also set display text for accessibility/fallback
             self.account_combo.setItemText(i, name)
 
     def refresh_profiles_async(self, force: bool = False) -> None:
         if not self.accounts:
-            return
-        account_ids = [str(a["account_id"]) for a in self.accounts]
-        api_key = (self.settings_data.get("api_key") or "").strip()
-        if not api_key:
-            # no API key -> ensure fallback display
             self.profiles = {}
             self.update_account_combo_display()
             return
-
-        task = FunctionRunnable(get_account_profiles, account_ids, api_key, force)
+        steam_path = self.settings_data.get("steam_path") or ""
+        if not steam_path or not Path(steam_path).exists():
+            self.profiles = {}
+            self.update_account_combo_display()
+            return
+        account_ids = [str(a["account_id"]) for a in self.accounts]
+        task = FunctionRunnable(get_local_profiles, steam_path, account_ids)
         task.signals.finished.connect(self.on_profiles_loaded)
         task.signals.error.connect(self.on_profiles_error)
         self.thread_pool.start(task)
@@ -363,11 +369,8 @@ class MainWindow(QMainWindow):
             self.update_account_combo_display()
 
     def on_profiles_error(self, message: str, details: str) -> None:
-        LOGGER.warning("Profile load error: %s\n%s", message, details)
-        # Don't block app; show status once
-        if "Steam API" in message or "ключ" in message.lower():
-            self.set_status("Ошибка Steam API")
-            QMessageBox.warning(self, "Steam API", f"Не удалось получить профили Steam: {message}")
+        LOGGER.warning("Local profile load error: %s\n%s", message, details)
+        self.set_status("Ошибка чтения профилей Steam")
 
     def on_account_changed(self, index: int) -> None:
         aid = self.get_selected_account_id()

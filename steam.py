@@ -424,6 +424,63 @@ def get_local_profile_info(steam_path: str | Path, account_id: str | int) -> Dic
     return {"persona_name": None, "account_name": lu.get("account_name") if lu else None, "source": "none"}
 
 
+def get_local_profiles(steam_path: str | Path, account_ids: List[str | int]) -> Dict[str, Dict[str, Any]]:
+    """Build local profile data for accounts (no network).
+
+    Result per account_id (str): {
+        "personaname": str,
+        "account_name": str|None,
+        "avatar_path": str|None,
+        "source": str,  # loginusers.vdf/localconfig.vdf/none
+    }
+    """
+    result: Dict[str, Dict[str, Any]] = {}
+    loginusers = read_loginusers_vdf(steam_path)
+    for aid in account_ids:
+        aid_str = str(aid)
+        try:
+            aid_int = int(aid)
+        except Exception:
+            result[aid_str] = {
+                "personaname": f"SteamID: {aid_str}",
+                "account_name": None,
+                "avatar_path": None,
+                "source": "none",
+            }
+            continue
+
+        lu = loginusers.get(aid_int)
+        persona = None
+        account_name = lu.get("account_name") if lu else None
+        source = "none"
+        if lu:
+            persona = (lu.get("persona_name") or "").strip() or None
+            if not persona and account_name:
+                persona = str(account_name).strip() or None
+            if persona:
+                source = "loginusers.vdf"
+        if not persona:
+            persona_local = read_localconfig_persona_name(steam_path, aid_int)
+            if persona_local:
+                persona = persona_local
+                source = "localconfig.vdf"
+        if not persona and account_name:
+            persona = str(account_name).strip() or None
+            if persona:
+                source = "loginusers.vdf"
+
+        if not persona:
+            persona = aid_str  # show AccountID as nickname fallback per requirements
+
+        result[aid_str] = {
+            "personaname": persona,
+            "account_name": account_name,
+            "avatar_path": None,  # added in later step
+            "source": source,
+        }
+    return result
+
+
 def _load_profile_cache() -> Dict[str, Any]:
     path = get_profile_cache_path()
     if not path.exists():
