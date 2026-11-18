@@ -1,4 +1,4 @@
-﻿"""Main application window."""
+"""Main application window."""
 
 from __future__ import annotations
 
@@ -719,7 +719,6 @@ class MainWindow(QMainWindow):
         self.tray_menu = QMenu(self)
         self.tray_menu.aboutToShow.connect(self._update_tray_menu)
         self.tray_icon.setContextMenu(self.tray_menu)
-        self.tray_icon.activated.connect(self._on_tray_activated)
         self.tray_icon.show()
         self._update_tray_menu()
         self._update_tray_tooltip()
@@ -746,7 +745,9 @@ class MainWindow(QMainWindow):
         if configs:
             for cfg in configs:
                 act = self.tray_menu.addAction(cfg.name)
-                act.triggered.connect(lambda _checked=False, p=cfg.path, n=cfg.name: self.quick_apply_config_from_tray(p, n))
+                act.triggered.connect(
+                    lambda _checked=False, p=cfg.path, n=cfg.name: self.quick_apply_config_from_tray(p, n)
+                )
         else:
             empty_act = self.tray_menu.addAction("??? ??????????? ????????")
             empty_act.setEnabled(False)
@@ -754,6 +755,7 @@ class MainWindow(QMainWindow):
         self.tray_menu.addSeparator()
         quit_action = self.tray_menu.addAction("?????")
         quit_action.triggered.connect(self.quit_from_tray)
+
 
     def _update_tray_tooltip(self) -> None:
         if not self.tray_icon:
@@ -764,9 +766,6 @@ class MainWindow(QMainWindow):
         else:
             self.tray_icon.setToolTip("DotaConfigSwitcher")
 
-    def _on_tray_activated(self, reason) -> None:
-        if reason == QSystemTrayIcon.ActivationReason.Trigger:
-            self.show_from_tray()
 
     def show_from_tray(self) -> None:
         self.showNormal()

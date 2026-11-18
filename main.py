@@ -1,4 +1,4 @@
-﻿"""Entry point for DotaConfigSwitcher."""
+"""Entry point for DotaConfigSwitcher."""
 
 from __future__ import annotations
 
