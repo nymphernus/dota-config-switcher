@@ -200,6 +200,7 @@ class ConfigCard(QFrame):
         self.more_btn.setObjectName("MoreButton")
         self.more_btn.setCursor(Qt.PointingHandCursor)
         self.more_btn.setPopupMode(QToolButton.InstantPopup)
+        self.more_btn.setStyleSheet("QToolButton::menu-indicator { image: none; width: 0px; }")
         menu = QMenu(self)
         act_open = menu.addAction("Открыть папку")
         act_delete = menu.addAction("Удалить")
