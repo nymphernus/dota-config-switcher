@@ -2,9 +2,10 @@
     [switch]$Clean
 )
 
+$env:PYTHONUTF8 = "1"
 $ErrorActionPreference = "Stop"
 
-Remove-Item -Recurse -Force build, dist -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force build, dist, DotaConfigSwitcher.spec -ErrorAction SilentlyContinue
 
 # Build DotaConfigSwitcher into a single-file windowed EXE using PyInstaller.
 # Run from project root, preferably inside activated .venv.
@@ -23,6 +24,7 @@ if (Test-Path ".\.venv\Scripts\pyinstaller.exe") {
 & $pyinstaller --noconfirm --clean --onefile --windowed `
     --name "DotaConfigSwitcher" `
     --icon "icon.ico" `
+    --add-data "icon.ico;." `
     --add-data "icon.png;." `
     main.py
 
