@@ -134,36 +134,13 @@ class MainWindow(QMainWindow):
 
         top_layout.addStretch(1)
 
-        header_actions = QHBoxLayout()
-        header_actions.setSpacing(8)
-
-        self.minimize_to_tray_btn = QToolButton()
-        self.minimize_to_tray_btn.setObjectName("IconButton")
-        self.minimize_to_tray_btn.setToolTip("\u0421\u0432\u0435\u0440\u043d\u0443\u0442\u044c \u0432 \u0442\u0440\u0435\u0439")
-        self.minimize_to_tray_btn.setIcon(self.style().standardIcon(QStyle.SP_TitleBarMinButton))
-        self.minimize_to_tray_btn.setIconSize(QSize(18, 18))
-        self.minimize_to_tray_btn.setFixedSize(32, 32)
-        self.minimize_to_tray_btn.clicked.connect(self.hide)
-        header_actions.addWidget(self.minimize_to_tray_btn, 0, Qt.AlignVCenter)
-
-        self.exit_app_btn = QToolButton()
-        self.exit_app_btn.setObjectName("IconButton")
-        self.exit_app_btn.setToolTip("\u0412\u044b\u0445\u043e\u0434")
-        self.exit_app_btn.setIcon(self.style().standardIcon(QStyle.SP_TitleBarCloseButton))
-        self.exit_app_btn.setIconSize(QSize(18, 18))
-        self.exit_app_btn.setFixedSize(32, 32)
-        self.exit_app_btn.clicked.connect(self.quit_from_tray)
-        header_actions.addWidget(self.exit_app_btn, 0, Qt.AlignVCenter)
-
         self.settings_btn = QToolButton()
         self.settings_btn.setObjectName("IconButton")
         self.settings_btn.setToolTip("\u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438")
         self.settings_btn.setText("\u2699")
         self.settings_btn.setFixedSize(32, 32)
         self.settings_btn.clicked.connect(self.open_settings_dialog)
-        header_actions.addWidget(self.settings_btn, 0, Qt.AlignVCenter)
-
-        top_layout.addLayout(header_actions)
+        top_layout.addWidget(self.settings_btn, 0, Qt.AlignVCenter)
         root.addWidget(top_bar)
 
         # Center area (scrollable config cards)
@@ -742,6 +719,7 @@ class MainWindow(QMainWindow):
         self.settings_data["last_applied_config_name"] = name
         save_settings(self.settings_data)
         self._update_tray_tooltip()
+        self._update_tray_menu()
         self.refresh_configs()
 
     def _init_tray_icon(self) -> None:
@@ -819,12 +797,21 @@ class MainWindow(QMainWindow):
         if app:
             app.quit()
 
-    def closeEvent(self, event: QCloseEvent) -> None:  # type: ignore[override]
-        if self._is_quitting or not self.tray_icon or not self.tray_icon.isVisible():
+    def changeEvent(self, event):  # type: ignore[override]
+        if event.type() == QEvent.WindowStateChange and self.isMinimized():
+            self.hide()
             event.accept()
             return
-        event.ignore()
-        self.hide()
+        super().changeEvent(event)
+
+    def closeEvent(self, event: QCloseEvent) -> None:  # type: ignore[override]
+        self._is_quitting = True
+        if self.tray_icon:
+            self.tray_icon.hide()
+        app = QApplication.instance()
+        if app:
+            app.quit()
+        event.accept()
 
     def rename_config(self, config_path: str) -> None:
         configs_dir = self.get_configs_dir()
@@ -1058,8 +1045,6 @@ class MainWindow(QMainWindow):
             self.empty_save_btn,
             self.empty_import_btn,
             self.settings_btn,
-            self.minimize_to_tray_btn,
-            self.exit_app_btn,
             self.favorite_btn,
             self.account_combo,
         ]
