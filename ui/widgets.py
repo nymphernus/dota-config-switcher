@@ -172,20 +172,24 @@ class ConfigCard(QFrame):
         layout.setContentsMargins(12, 10, 12, 10)
         layout.setSpacing(12)
 
-        # Folder icon
-        icon_label = QLabel()
+        # Folder icon (clickable)
+        self.folder_btn = QToolButton()
+        self.folder_btn.setObjectName("IconButton")
         icon = self.style().standardIcon(QStyle.SP_DirIcon)
-        icon_label.setPixmap(icon.pixmap(28, 28))
-        icon_label.setFixedSize(32, 32)
-        icon_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(icon_label, 0, Qt.AlignTop)
+        self.folder_btn.setIcon(icon)
+        self.folder_btn.setIconSize(QSize(28, 28))
+        self.folder_btn.setFixedSize(32, 32)
+        self.folder_btn.setCursor(Qt.PointingHandCursor)
+        self.folder_btn.setToolTip("\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u043f\u0430\u043f\u043a\u0443 \u043a\u043e\u043d\u0444\u0438\u0433\u0430")
+        self.folder_btn.clicked.connect(lambda: self.open_clicked.emit(self.config_path))
+        layout.addWidget(self.folder_btn, 0, Qt.AlignTop)
 
         # Texts
         text_col = QVBoxLayout()
         text_col.setSpacing(2)
         self.name_label = QLabel(name)
         self.name_label.setObjectName("ConfigName")
-        self.meta_label = QLabel(f"Изменён: {modified}   •   Размер: {size}")
+        self.meta_label = QLabel(f"\u0418\u0437\u043c\u0435\u043d\u0451\u043d: {modified}   \u2022   \u0420\u0430\u0437\u043c\u0435\u0440: {size}")
         self.meta_label.setObjectName("ConfigMeta")
         text_col.addWidget(self.name_label)
         text_col.addWidget(self.meta_label)
@@ -194,13 +198,13 @@ class ConfigCard(QFrame):
         # Buttons
         btn_col = QHBoxLayout()
         btn_col.setSpacing(6)
-        self.apply_btn = QPushButton("Применить")
+        self.apply_btn = QPushButton("\u041f\u0440\u0438\u043c\u0435\u043d\u0438\u0442\u044c")
         self.apply_btn.setObjectName("ApplyButton")
         self.apply_btn.setCursor(Qt.PointingHandCursor)
         self.apply_btn.clicked.connect(lambda: self.apply_clicked.emit(self.config_path))
 
         self.more_btn = QToolButton()
-        self.more_btn.setText("⋯")
+        self.more_btn.setText("\u22ef")
         self.more_btn.setObjectName("MoreButton")
         self.more_btn.setCursor(Qt.PointingHandCursor)
         self.more_btn.setPopupMode(QToolButton.InstantPopup)
@@ -220,6 +224,7 @@ class ConfigCard(QFrame):
         btn_col.addWidget(self.apply_btn)
         btn_col.addWidget(self.more_btn)
         layout.addLayout(btn_col)
+
 
 def _inherit_parent_style(dialog: QDialog, parent: Optional[QWidget]) -> None:
     if parent is not None and hasattr(parent, "styleSheet"):
