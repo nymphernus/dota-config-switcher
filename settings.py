@@ -92,6 +92,7 @@ def default_settings() -> Dict[str, Any]:
         "configs_dir": str(get_default_configs_dir()),
         "last_applied_config": "",
         "migrated_from_legacy": False,
+        "autostart": False,
     }
 
 
@@ -280,6 +281,7 @@ def load_settings() -> Dict[str, Any]:
     settings["configs_dir"] = str(settings.get("configs_dir") or get_default_configs_dir())
     settings["last_applied_config"] = str(settings.get("last_applied_config") or "")
     settings["migrated_from_legacy"] = bool(settings.get("migrated_from_legacy", False))
+    settings["autostart"] = bool(settings.get("autostart", False))
 
     # Ensure configs dir exists
     try:
@@ -297,16 +299,25 @@ def save_settings(settings: Dict[str, Any]) -> None:
         for k in data.keys():
             if k in settings:
                 data[k] = settings[k]
-    # Normalize known string fields
+    # Normalize known fields
     data["steam_path"] = str(data.get("steam_path") or "")
     data["selected_account_id"] = str(data.get("selected_account_id") or "")
     data["favorite_account_id"] = str(data.get("favorite_account_id") or "")
     data["configs_dir"] = str(data.get("configs_dir") or get_default_configs_dir())
     data["last_applied_config"] = str(data.get("last_applied_config") or "")
+    data["migrated_from_legacy"] = bool(data.get("migrated_from_legacy", False))
+    data["autostart"] = bool(data.get("autostart", False))
     # Only persist known settings (drops legacy keys like api_key)
     tmp_path = path.with_suffix(".tmp")
     with tmp_path.open("w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     os.replace(tmp_path, path)
+
+    try:
+        from autostart import set_autostart
+
+        set_autostart(bool(data.get("autostart", False)))
+    except Exception as e:
+        LOGGER.warning("Failed to apply autostart setting: %s", e)
 
 
