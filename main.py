@@ -74,7 +74,9 @@ def main() -> int:
         app.setWindowIcon(QIcon(str(icon_path)))
 
     window = MainWindow()
-    window.show()
+    minimized = any(arg in ("--minimized", "--silent") for arg in sys.argv[1:])
+    if not minimized:
+        window.show()
     return app.exec()
 
 
