@@ -729,7 +729,9 @@ class MainWindow(QMainWindow):
 
 
     def _record_last_applied_config(self, config_name: str) -> None:
-        self.settings_data["last_applied_config"] = str(config_name or "")
+        name = str(config_name or "")
+        self.settings_data["last_applied_config"] = name
+        self.settings_data["last_applied_config_name"] = name
         save_settings(self.settings_data)
         self._update_tray_tooltip()
 
@@ -788,9 +790,9 @@ class MainWindow(QMainWindow):
     def _update_tray_tooltip(self) -> None:
         if not self.tray_icon:
             return
-        last = str(self.settings_data.get("last_applied_config") or "").strip()
+        last = str(self.settings_data.get("last_applied_config_name") or self.settings_data.get("last_applied_config") or "").strip()
         if last:
-            self.tray_icon.setToolTip(f"DotaConfigSwitcher\nТекущий активный конфиг: {last}")
+            self.tray_icon.setToolTip(f"DotaConfigSwitcher\n\u0422\u0435\u043a\u0443\u0449\u0438\u0439 \u0430\u043a\u0442\u0438\u0432\u043d\u044b\u0439 \u043a\u043e\u043d\u0444\u0438\u0433: {last}")
         else:
             self.tray_icon.setToolTip("DotaConfigSwitcher")
 
@@ -807,6 +809,13 @@ class MainWindow(QMainWindow):
         app = QApplication.instance()
         if app:
             app.quit()
+
+    def closeEvent(self, event: QCloseEvent) -> None:  # type: ignore[override]
+        if self._is_quitting or not self.tray_icon or not self.tray_icon.isVisible():
+            event.accept()
+            return
+        event.ignore()
+        self.hide()
 
     def rename_config(self, config_path: str) -> None:
         configs_dir = self.get_configs_dir()
@@ -859,8 +868,12 @@ class MainWindow(QMainWindow):
             self.set_status("\u041e\u0448\u0438\u0431\u043a\u0430 \u043f\u0435\u0440\u0435\u0438\u043c\u0435\u043d\u043e\u0432\u0430\u043d\u0438\u044f", "error")
             return
 
-        if str(self.settings_data.get("last_applied_config") or "") == old_name:
+        last_applied = str(
+            self.settings_data.get("last_applied_config_name") or self.settings_data.get("last_applied_config") or ""
+        ).strip()
+        if last_applied == old_name:
             self.settings_data["last_applied_config"] = new_name
+            self.settings_data["last_applied_config_name"] = new_name
             save_settings(self.settings_data)
             self._update_tray_tooltip()
 
@@ -894,13 +907,6 @@ class MainWindow(QMainWindow):
             LOGGER.exception("Tray quick-apply failed: %s", e)
             if self.tray_icon:
                 self.tray_icon.showMessage("DotaConfigSwitcher", f"Ошибка применения: {e}", QSystemTrayIcon.Critical, 5000)
-
-    def closeEvent(self, event: QCloseEvent) -> None:  # type: ignore[override]
-        if self._is_quitting or not self.tray_icon or not self.tray_icon.isVisible():
-            event.accept()
-            return
-        event.ignore()
-        self.hide()
 
     def open_import_dialog(self) -> None:
         configs_dir = self.get_configs_dir()
@@ -1060,7 +1066,12 @@ class MainWindow(QMainWindow):
             card = item.widget()
             if isinstance(card, ConfigCard):
                 card.apply_btn.setDisabled(busy)
-                card.more_btn.setDisabled(busy)
+                if hasattr(card, "rename_btn"):
+                    card.rename_btn.setDisabled(busy)
+                if hasattr(card, "delete_btn"):
+                    card.delete_btn.setDisabled(busy)
+                if hasattr(card, "more_btn"):
+                    card.more_btn.setDisabled(busy)
 
         self.progress_bar.setVisible(busy)
         if busy:

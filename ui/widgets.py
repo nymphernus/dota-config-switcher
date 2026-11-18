@@ -160,7 +160,15 @@ class ConfigCard(QFrame):
     open_clicked = Signal(str)
     rename_clicked = Signal(str)
 
-    def __init__(self, name: str, path: str, modified: str, size: str, parent: Optional[QWidget] = None):
+    def __init__(
+        self,
+        name: str,
+        path: str,
+        modified: str,
+        size: str,
+        is_last_applied: bool = False,
+        parent: Optional[QWidget] = None,
+    ):
         super().__init__(parent)
         self.config_name = name
         self.config_path = path
@@ -198,32 +206,62 @@ class ConfigCard(QFrame):
         # Buttons
         btn_col = QHBoxLayout()
         btn_col.setSpacing(6)
-        self.apply_btn = QPushButton("\u041f\u0440\u0438\u043c\u0435\u043d\u0438\u0442\u044c")
-        self.apply_btn.setObjectName("ApplyButton")
+
+        self.apply_btn = QToolButton()
+        self.apply_btn.setObjectName("ConfigActionButton")
+        self.apply_btn.setIcon(self.style().standardIcon(QStyle.SP_DialogApplyButton))
+        self.apply_btn.setIconSize(QSize(18, 18))
+        self.apply_btn.setFixedSize(32, 32)
         self.apply_btn.setCursor(Qt.PointingHandCursor)
+        self.apply_btn.setToolTip("\u041f\u0440\u0438\u043c\u0435\u043d\u0438\u0442\u044c")
         self.apply_btn.clicked.connect(lambda: self.apply_clicked.emit(self.config_path))
 
-        self.more_btn = QToolButton()
-        self.more_btn.setText("\u22ef")
-        self.more_btn.setObjectName("MoreButton")
-        self.more_btn.setCursor(Qt.PointingHandCursor)
-        self.more_btn.setPopupMode(QToolButton.InstantPopup)
-        self.more_btn.setStyleSheet("QToolButton::menu-indicator { image: none; width: 0px; }")
-        menu = QMenu(self)
-        act_open = QAction("\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u043f\u0430\u043f\u043a\u0443", menu)
-        menu.addAction(act_open)
-        act_rename = QAction("\u041f\u0435\u0440\u0435\u0438\u043c\u0435\u043d\u043e\u0432\u0430\u0442\u044c", menu)
-        menu.addAction(act_rename)
-        act_delete = QAction("\u0423\u0434\u0430\u043b\u0438\u0442\u044c", menu)
-        menu.addAction(act_delete)
-        act_open.triggered.connect(lambda: self.open_clicked.emit(self.config_path))
-        act_rename.triggered.connect(lambda: self.rename_clicked.emit(self.config_path))
-        act_delete.triggered.connect(lambda: self.delete_clicked.emit(self.config_path))
-        self.more_btn.setMenu(menu)
+        self.rename_btn = QToolButton()
+        self.rename_btn.setObjectName("ConfigActionButton")
+        self.rename_btn.setText("\u270e")
+        self.rename_btn.setFixedSize(32, 32)
+        self.rename_btn.setCursor(Qt.PointingHandCursor)
+        self.rename_btn.setToolTip("\u041f\u0435\u0440\u0435\u0438\u043c\u0435\u043d\u043e\u0432\u0430\u0442\u044c")
+        self.rename_btn.clicked.connect(lambda: self.rename_clicked.emit(self.config_path))
+
+        self.delete_btn = QToolButton()
+        self.delete_btn.setObjectName("ConfigDeleteButton")
+        self.delete_btn.setIcon(self.style().standardIcon(QStyle.SP_TrashIcon))
+        self.delete_btn.setIconSize(QSize(18, 18))
+        self.delete_btn.setFixedSize(32, 32)
+        self.delete_btn.setCursor(Qt.PointingHandCursor)
+        self.delete_btn.setToolTip("\u0423\u0434\u0430\u043b\u0438\u0442\u044c")
+        self.delete_btn.clicked.connect(lambda: self.delete_clicked.emit(self.config_path))
+
+        self._apply_button_styles(is_last_applied)
 
         btn_col.addWidget(self.apply_btn)
-        btn_col.addWidget(self.more_btn)
+        btn_col.addWidget(self.rename_btn)
+        btn_col.addWidget(self.delete_btn)
         layout.addLayout(btn_col)
+
+    def set_last_applied(self, is_last_applied: bool) -> None:
+        self._apply_button_styles(is_last_applied)
+
+    def _apply_button_styles(self, is_last_applied: bool) -> None:
+        base_btn_style = (
+            "QToolButton { background-color: #343447; border: 1px solid #404055; border-radius: 8px; padding: 4px; }"
+            "QToolButton:hover { background-color: #3b3b52; }"
+            "QToolButton:disabled { background-color: #2d2d3b; border-color: #353545; color: #7f8796; }"
+        )
+        apply_bg = "#2e4a2e" if is_last_applied else "#343447"
+        apply_hover = "#355735" if is_last_applied else "#3b3b52"
+        self.apply_btn.setStyleSheet(
+            f"QToolButton {{ background-color: {apply_bg}; border: 1px solid #404055; border-radius: 8px; padding: 4px; }}"
+            f"QToolButton:hover {{ background-color: {apply_hover}; }}"
+            "QToolButton:disabled { background-color: #2d2d3b; border-color: #353545; }"
+        )
+        self.rename_btn.setStyleSheet(base_btn_style)
+        self.delete_btn.setStyleSheet(
+            "QToolButton { background-color: #5a2a2a; border: 1px solid #6a3535; border-radius: 8px; padding: 4px; color: #ffffff; }"
+            "QToolButton:hover { background-color: #6a3232; }"
+            "QToolButton:disabled { background-color: #3a2424; border-color: #4a3030; color: #8a6a6a; }"
+        )
 
 
 def _inherit_parent_style(dialog: QDialog, parent: Optional[QWidget]) -> None:
