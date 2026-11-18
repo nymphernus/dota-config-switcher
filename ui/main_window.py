@@ -738,7 +738,7 @@ class MainWindow(QMainWindow):
         self.tray_menu.clear()
 
         profile_name = self._get_favorite_profile_display_name()
-        profile_action = QAction(f"???????: {profile_name}", self.tray_menu)
+        profile_action = QAction(f"\u041f\u0440\u043e\u0444\u0438\u043b\u044c: {profile_name}", self.tray_menu)
         self.tray_menu.addAction(profile_action)
         profile_action.triggered.connect(self.show_from_tray)
         self.tray_menu.addSeparator()
@@ -752,12 +752,12 @@ class MainWindow(QMainWindow):
                     lambda _checked=False, p=cfg.path, n=cfg.name: self.quick_apply_config_from_tray(p, n)
                 )
         else:
-            empty_act = QAction("??? ??????????? ????????", self.tray_menu)
+            empty_act = QAction("\u041d\u0435\u0442 \u0441\u043e\u0445\u0440\u0430\u043d\u0451\u043d\u043d\u044b\u0445 \u043a\u043e\u043d\u0444\u0438\u0433\u043e\u0432", self.tray_menu)
             self.tray_menu.addAction(empty_act)
             empty_act.setEnabled(False)
 
         self.tray_menu.addSeparator()
-        quit_action = QAction("?????", self.tray_menu)
+        quit_action = QAction("\u0412\u044b\u0445\u043e\u0434", self.tray_menu)
         self.tray_menu.addAction(quit_action)
         quit_action.triggered.connect(self.quit_from_tray)
 

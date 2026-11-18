@@ -5,8 +5,6 @@ from __future__ import annotations
 import logging
 import os
 os.environ["QT_NO_NATIVE_MENUS"] = "1"
-os.environ["LANG"] = "ru_RU.UTF-8"
-os.environ["LC_ALL"] = "ru_RU.UTF-8"
 import sys
 
 if sys.stdout is not None:
