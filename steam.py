@@ -1,4 +1,4 @@
-"""Steam detection, Steam account enumeration, and Steam Web API helpers."""
+"""Steam detection, Steam account enumeration, and local profile/API helpers."""
 
 from __future__ import annotations
 
@@ -7,9 +7,10 @@ import logging
 import os
 import re
 import time
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 try:
     import winreg  # type: ignore
@@ -166,6 +167,261 @@ def enumerate_accounts(steam_path: str) -> List[Dict[str, Any]]:
 
 def to_steamid64(account_id: str | int) -> str:
     return str(int(account_id) + STEAMID64_OFFSET)
+
+
+@dataclass
+class SteamAccount:
+    account_id: int            # из имени папки userdata
+    steam_id64: int            # account_id + 76561197960265728
+    persona_name: str          # из loginusers.vdf, fallback localconfig.vdf
+    account_name: Optional[str]  # из loginusers.vdf
+    avatar_path: Optional[Path]  # путь к локальному файлу аватарки или None
+    has_dota: bool             # есть ли userdata\<id>\570
+
+
+def _strip_bom(text: str) -> str:
+    if text.startswith("\ufeff"):
+        return text.lstrip("\ufeff")
+    return text
+
+
+def parse_vdf_text(text: str) -> Dict[str, Any]:
+    """Parse Valve Data Format (VDF) text into nested dicts.
+
+    Supports quoted keys/values, nested blocks in {}, // comments, BOM and CRLF.
+    Returns {} on parse errors.
+    """
+    try:
+        text = _strip_bom(text or "")
+        i = 0
+        n = len(text)
+
+        def skip_ws_and_comments() -> None:
+            nonlocal i
+            while i < n:
+                ch = text[i]
+                if ch in " \t\r\n":
+                    i += 1
+                    continue
+                if ch == "/" and i + 1 < n and text[i + 1] == "/":
+                    # comment until end of line
+                    i += 2
+                    while i < n and text[i] not in "\r\n":
+                        i += 1
+                    continue
+                break
+
+        def parse_string_token() -> str:
+            nonlocal i
+            if i >= n:
+                raise ValueError("Unexpected end of VDF while reading token")
+            ch = text[i]
+            if ch == '"':
+                i += 1
+                out = []
+                while i < n:
+                    c = text[i]
+                    if c == "\\" and i + 1 < n:
+                        # basic escape handling
+                        nxt = text[i + 1]
+                        if nxt in ['"', "\\"]:
+                            out.append(nxt)
+                            i += 2
+                            continue
+                        # keep escaped char as-is (e.g. \n)
+                        out.append(nxt)
+                        i += 2
+                        continue
+                    if c == '"':
+                        i += 1
+                        return "".join(out)
+                    out.append(c)
+                    i += 1
+                raise ValueError("Unterminated quoted string in VDF")
+            else:
+                # unquoted token until whitespace, brace, or comment
+                start = i
+                while i < n:
+                    c = text[i]
+                    if c in " \t\r\n{}":
+                        break
+                    if c == "/" and i + 1 < n and text[i + 1] == "/":
+                        break
+                    i += 1
+                if start == i:
+                    raise ValueError("Expected token in VDF")
+                return text[start:i]
+
+        def parse_object() -> Dict[str, Any]:
+            nonlocal i
+            obj: Dict[str, Any] = {}
+            while True:
+                skip_ws_and_comments()
+                if i >= n:
+                    break
+                if text[i] == "}":
+                    i += 1
+                    break
+                key = parse_string_token()
+                skip_ws_and_comments()
+                if i >= n:
+                    raise ValueError("Unexpected end of VDF after key")
+                if text[i] == "{":
+                    i += 1
+                    value = parse_object()
+                else:
+                    value = parse_string_token()
+                obj[key] = value
+            return obj
+
+        # Parse top-level key/value pairs (common VDF files have one root object)
+        root: Dict[str, Any] = {}
+        while True:
+            skip_ws_and_comments()
+            if i >= n:
+                break
+            # tolerate stray closing brace
+            if text[i] == "}":
+                i += 1
+                continue
+            key = parse_string_token()
+            skip_ws_and_comments()
+            if i >= n:
+                raise ValueError("Unexpected end of VDF after top-level key")
+            if text[i] == "{":
+                i += 1
+                value = parse_object()
+            else:
+                value = parse_string_token()
+            root[key] = value
+        return root
+    except Exception as e:
+        LOGGER.warning("Failed to parse VDF: %s", e)
+        return {}
+
+
+def load_vdf(path: str | Path) -> Dict[str, Any]:
+    p = Path(path)
+    try:
+        # utf-8-sig handles BOM; errors ignored for robustness
+        text = p.read_text(encoding="utf-8-sig", errors="ignore")
+    except Exception as e:
+        LOGGER.warning("Failed to read VDF file %s: %s", p, e)
+        return {}
+    return parse_vdf_text(text)
+
+
+def read_loginusers_vdf(steam_path: str | Path) -> Dict[int, Dict[str, Any]]:
+    """Read <steam>/config/loginusers.vdf.
+
+    Returns mapping account_id (int) -> {steam_id64, persona_name, account_name, ...}.
+    """
+    path = Path(_normalize_path(str(steam_path))) / "config" / "loginusers.vdf"
+    data = load_vdf(path)
+    users = data.get("users") if isinstance(data, dict) else None
+    if not isinstance(users, dict):
+        # sometimes file structure differs; try root if it looks like users map
+        users = data if isinstance(data, dict) else {}
+    result: Dict[int, Dict[str, Any]] = {}
+    for key, value in users.items():
+        if not isinstance(value, dict):
+            continue
+        sid64_str = str(key).strip()
+        if not sid64_str.isdigit():
+            # sometimes nested differently; skip
+            continue
+        try:
+            sid64 = int(sid64_str)
+            account_id = sid64 - STEAMID64_OFFSET
+            if account_id < 0:
+                continue
+        except Exception:
+            continue
+        persona = str(value.get("PersonaName") or "").strip()
+        account_name = str(value.get("AccountName") or "").strip() or None
+        if not persona and account_name:
+            persona = account_name
+        result[int(account_id)] = {
+            "account_id": int(account_id),
+            "steam_id64": int(sid64),
+            "persona_name": persona,
+            "account_name": account_name,
+            "timestamp": value.get("Timestamp"),
+            "most_recent": value.get("MostRecent"),
+        }
+    return result
+
+
+def _find_persona_name_in_vdf(obj: Any) -> Optional[str]:
+    """Recursively find first PersonaName string in a parsed VDF structure."""
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if str(k).lower() == "personaname" and isinstance(v, str) and v.strip():
+                return v.strip()
+        for v in obj.values():
+            found = _find_persona_name_in_vdf(v)
+            if found:
+                return found
+    elif isinstance(obj, list):
+        for v in obj:
+            found = _find_persona_name_in_vdf(v)
+            if found:
+                return found
+    return None
+
+
+def read_localconfig_persona_name(steam_path: str | Path, account_id: str | int) -> Optional[str]:
+    """Fallback: read PersonaName from userdata/<account_id>/config/localconfig.vdf."""
+    path = Path(_normalize_path(str(steam_path))) / "userdata" / str(account_id) / "config" / "localconfig.vdf"
+    if not path.exists():
+        return None
+    data = load_vdf(path)
+    if not data:
+        return None
+    # Prefer friends section if present
+    try:
+        root = data.get("UserLocalConfigStore") if isinstance(data, dict) else None
+        if isinstance(root, dict):
+            friends = root.get("friends")
+            if isinstance(friends, dict):
+                name = _find_persona_name_in_vdf(friends)
+                if name:
+                    return name
+    except Exception:
+        pass
+    # Fallback: first PersonaName anywhere
+    name = _find_persona_name_in_vdf(data)
+    return name or None
+
+
+def get_local_profile_info(steam_path: str | Path, account_id: str | int) -> Dict[str, Optional[str]]:
+    """Resolve persona/account name from local Steam files.
+
+    Returns {"persona_name": str|None, "account_name": str|None, "source": str}
+    source in {"loginusers.vdf", "localconfig.vdf", "none"}.
+    """
+    aid_int = int(account_id)
+    loginusers = read_loginusers_vdf(steam_path)
+    lu = loginusers.get(aid_int)
+    if lu:
+        persona = (lu.get("persona_name") or "").strip() or None
+        account_name = (lu.get("account_name") or None)
+        if not persona and account_name:
+            persona = account_name
+        if persona:
+            return {"persona_name": persona, "account_name": account_name, "source": "loginusers.vdf"}
+        # loginusers entry exists but no name -> try localconfig before giving up account_name
+    persona_local = read_localconfig_persona_name(steam_path, aid_int)
+    if persona_local:
+        account_name = lu.get("account_name") if lu else None
+        return {"persona_name": persona_local, "account_name": account_name, "source": "localconfig.vdf"}
+    if lu and (lu.get("account_name") or "").strip():
+        return {
+            "persona_name": str(lu.get("account_name")).strip(),
+            "account_name": lu.get("account_name"),
+            "source": "loginusers.vdf",
+        }
+    return {"persona_name": None, "account_name": lu.get("account_name") if lu else None, "source": "none"}
 
 
 def _load_profile_cache() -> Dict[str, Any]:
