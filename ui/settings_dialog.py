@@ -69,11 +69,6 @@ class SettingsDialog(QDialog):
         configs_wrap.setLayout(configs_row)
         form.addRow("Папка конфигов:", configs_wrap)
 
-        hint = QLabel("Никнеймы и аватарки читаются из локальных файлов Steam (без интернета и API-ключа).")
-        hint.setWordWrap(True)
-        hint.setStyleSheet("color: #9aa3b2; font-size: 12px;")
-        form.addRow("", hint)
-
         layout.addLayout(form)
         layout.addStretch(1)
 

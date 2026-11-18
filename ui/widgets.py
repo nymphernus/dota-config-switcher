@@ -155,7 +155,6 @@ class ConfigCard(QFrame):
     apply_clicked = Signal(str)  # config path
     delete_clicked = Signal(str)
     open_clicked = Signal(str)
-    details_clicked = Signal(str)
 
     def __init__(self, name: str, path: str, modified: str, size: str, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -164,7 +163,6 @@ class ConfigCard(QFrame):
         self.setObjectName("ConfigCard")
         self.setFrameShape(QFrame.StyledPanel)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.setCursor(Qt.PointingHandCursor)
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(12, 10, 12, 10)
@@ -203,10 +201,8 @@ class ConfigCard(QFrame):
         self.more_btn.setCursor(Qt.PointingHandCursor)
         self.more_btn.setPopupMode(QToolButton.InstantPopup)
         menu = QMenu(self)
-        act_details = menu.addAction("Детали")
         act_open = menu.addAction("Открыть папку")
         act_delete = menu.addAction("Удалить")
-        act_details.triggered.connect(lambda: self.details_clicked.emit(self.config_path))
         act_open.triggered.connect(lambda: self.open_clicked.emit(self.config_path))
         act_delete.triggered.connect(lambda: self.delete_clicked.emit(self.config_path))
         self.more_btn.setMenu(menu)
@@ -214,11 +210,3 @@ class ConfigCard(QFrame):
         btn_col.addWidget(self.apply_btn)
         btn_col.addWidget(self.more_btn)
         layout.addLayout(btn_col)
-
-    def mouseReleaseEvent(self, event):  # type: ignore[override]
-        if event.button() == Qt.LeftButton:
-            child = self.childAt(event.pos())
-            # Ignore clicks on interactive controls
-            if not isinstance(child, (QPushButton, QToolButton)) and child is not self.more_btn and child is not self.apply_btn:
-                self.details_clicked.emit(self.config_path)
-        super().mouseReleaseEvent(event)

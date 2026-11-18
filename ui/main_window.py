@@ -39,7 +39,6 @@ from configs import (
     list_configs,
     open_in_explorer,
     save_current_config,
-    scan_config_details,
     scan_importable_configs,
     validate_config_name_format,
 )
@@ -80,7 +79,6 @@ class MainWindow(QMainWindow):
         self.configs_cache: List[ConfigInfo] = []
         self.current_copy_worker: Optional[CopyWorker] = None
         self.thread_pool = QThreadPool.globalInstance()
-        self._current_steam_path: str = ""
         self._is_quitting: bool = False
         self.tray_icon: Optional[QSystemTrayIcon] = None
         self.tray_menu: Optional[QMenu] = None
@@ -125,15 +123,6 @@ class MainWindow(QMainWindow):
         top_layout.addWidget(self.favorite_btn, 0, Qt.AlignVCenter)
 
         top_layout.addStretch(1)
-
-        self.steam_path_label = QLabel()
-        self.steam_path_label.setObjectName("SteamPathLabel")
-        self.steam_path_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self.steam_path_label.setMinimumWidth(120)
-        self.steam_path_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self.steam_path_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self.steam_path_label.installEventFilter(self)
-        top_layout.addWidget(self.steam_path_label, 1, Qt.AlignVCenter)
 
         self.change_path_btn = QToolButton()
         self.change_path_btn.setObjectName("IconButton")
@@ -295,7 +284,6 @@ class MainWindow(QMainWindow):
     # --- Initialization & state ---
     def initialize_state(self) -> None:
         self.ensure_steam_path()
-        self.update_steam_path_label()
         self.refresh_accounts(select_saved=True, prefer_favorite=True)
         self.refresh_configs()
         self.refresh_profiles_async(force=True)
@@ -326,22 +314,6 @@ class MainWindow(QMainWindow):
         )
         self.choose_steam_path()
 
-    def update_steam_path_label(self) -> None:
-        path = str(self.settings_data.get("steam_path") or "Не задан")
-        self._current_steam_path = path
-        self._elide_steam_path_label()
-        self.steam_path_label.setToolTip(path)
-
-    def _elide_steam_path_label(self) -> None:
-        text = self._current_steam_path or "Не задан"
-        fm = QFontMetrics(self.steam_path_label.font())
-        width = max(80, self.steam_path_label.width() - 4)
-        self.steam_path_label.setText(fm.elidedText(text, Qt.ElideMiddle, width))
-
-    def eventFilter(self, obj, event):  # type: ignore[override]
-        if obj is self.steam_path_label and event.type() in (QEvent.Resize, QEvent.Show):
-            self._elide_steam_path_label()
-        return super().eventFilter(obj, event)
 
     @staticmethod
     def _sanitize_account_id(value: Any) -> Optional[str]:
@@ -612,7 +584,6 @@ class MainWindow(QMainWindow):
             card.apply_clicked.connect(self.start_apply_config)
             card.delete_clicked.connect(self.confirm_delete_config)
             card.open_clicked.connect(self.open_config_folder)
-            card.details_clicked.connect(self.show_config_details)
             self.cards_layout.insertWidget(self.cards_layout.count() - 1, card)
 
     # --- Actions ---
@@ -623,7 +594,6 @@ class MainWindow(QMainWindow):
             return
         self.settings_data["steam_path"] = path
         save_settings(self.settings_data)
-        self.update_steam_path_label()
         self.refresh_accounts(select_saved=True)
         self.refresh_configs()
         self.refresh_profiles_async(force=True)
@@ -635,8 +605,7 @@ class MainWindow(QMainWindow):
             new_settings = dlg.get_settings()
             self.settings_data.update(new_settings)
             save_settings(self.settings_data)
-            self.update_steam_path_label()
-            self.refresh_accounts(select_saved=True)
+                self.refresh_accounts(select_saved=True)
             self.refresh_configs()
             self.refresh_profiles_async(force=True)
             self.set_status("Настройки сохранены", "ok")
@@ -734,17 +703,6 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", f"Не удалось открыть папку: {e}")
             self.set_status("Не удалось открыть папку", "error")
 
-    def show_config_details(self, config_path: str) -> None:
-        try:
-            details = scan_config_details(config_path)
-        except Exception as e:
-            LOGGER.exception("Failed to scan config details %s: %s", config_path, e)
-            QMessageBox.warning(self, "Ошибка", f"Не удалось прочитать детали конфига: {e}")
-            return
-
-        from ui.config_details_dialog import ConfigDetailsDialog
-        dlg = ConfigDetailsDialog(Path(config_path).name, details, self)
-        dlg.exec()
 
     def _record_last_applied_config(self, config_name: str) -> None:
         self.settings_data["last_applied_config"] = str(config_name or "")
