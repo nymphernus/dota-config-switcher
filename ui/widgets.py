@@ -155,6 +155,7 @@ class ConfigCard(QFrame):
     apply_clicked = Signal(str)  # config path
     delete_clicked = Signal(str)
     open_clicked = Signal(str)
+    rename_clicked = Signal(str)
 
     def __init__(self, name: str, path: str, modified: str, size: str, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -202,9 +203,11 @@ class ConfigCard(QFrame):
         self.more_btn.setPopupMode(QToolButton.InstantPopup)
         self.more_btn.setStyleSheet("QToolButton::menu-indicator { image: none; width: 0px; }")
         menu = QMenu(self)
-        act_open = menu.addAction("Открыть папку")
-        act_delete = menu.addAction("Удалить")
+        act_open = menu.addAction("??????? ?????")
+        act_rename = menu.addAction("?????????????")
+        act_delete = menu.addAction("???????")
         act_open.triggered.connect(lambda: self.open_clicked.emit(self.config_path))
+        act_rename.triggered.connect(lambda: self.rename_clicked.emit(self.config_path))
         act_delete.triggered.connect(lambda: self.delete_clicked.emit(self.config_path))
         self.more_btn.setMenu(menu)
 

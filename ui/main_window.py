@@ -584,6 +584,7 @@ class MainWindow(QMainWindow):
             card.apply_clicked.connect(self.start_apply_config)
             card.delete_clicked.connect(self.confirm_delete_config)
             card.open_clicked.connect(self.open_config_folder)
+            card.rename_clicked.connect(self.rename_config)
             self.cards_layout.insertWidget(self.cards_layout.count() - 1, card)
 
     # --- Actions ---
@@ -779,6 +780,58 @@ class MainWindow(QMainWindow):
         app = QApplication.instance()
         if app:
             app.quit()
+
+    def rename_config(self, config_path: str) -> None:
+        configs_dir = self.get_configs_dir()
+        old_path = Path(config_path)
+        old_name = old_path.name
+        if not configs_dir:
+            QMessageBox.warning(self, "??????????????", "????? ???????? ?? ??????.")
+            return
+
+        new_name, ok = QInputDialog.getText(
+            self,
+            "????????????? ??????",
+            "????? ???:",
+            text=old_name,
+        )
+        if not ok:
+            return
+        new_name = (new_name or "").strip()
+        if not new_name or new_name == old_name:
+            return
+
+        fmt_ok, fmt_msg = validate_config_name_format(new_name)
+        if not fmt_ok:
+            QMessageBox.warning(self, "??????????????", fmt_msg)
+            return
+
+        target_path = Path(configs_dir) / new_name
+        if target_path.exists():
+            try:
+                same = target_path.resolve() == old_path.resolve()
+            except Exception:
+                same = str(target_path).lower() == str(old_path).lower()
+            if not same:
+                QMessageBox.warning(self, "??????????????", "?????? ? ????? ?????? ??? ??????????.")
+                return
+
+        try:
+            old_path.rename(target_path)
+        except Exception as e:
+            LOGGER.exception("Failed to rename config %s -> %s: %s", old_path, target_path, e)
+            QMessageBox.critical(self, "??????", f"?? ??????? ????????????? ??????: {e}")
+            self.set_status("?????? ??????????????", "error")
+            return
+
+        if str(self.settings_data.get("last_applied_config_name") or "") == old_name:
+            self.settings_data["last_applied_config_name"] = new_name
+            save_settings(self.settings_data)
+            self._update_tray_tooltip()
+
+        self.refresh_configs()
+        self.set_status(f"?????? ????????????: {new_name}", "ok")
+
 
     def quick_apply_config_from_tray(self, config_path: str, config_name: str) -> None:
         steam_path = str(self.settings_data.get("steam_path") or "").strip()
