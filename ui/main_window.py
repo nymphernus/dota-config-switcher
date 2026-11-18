@@ -29,9 +29,21 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from configs import ConfigInfo, apply_config, delete_config, format_size, list_configs, open_in_explorer, save_current_config
+from configs import (
+    ConfigInfo,
+    apply_config,
+    delete_config,
+    format_size,
+    import_config_folder,
+    list_configs,
+    open_in_explorer,
+    save_current_config,
+    scan_importable_configs,
+    validate_config_name_format,
+)
 from settings import get_base_dir, load_settings, save_settings
 from steam import detect_steam_path, enumerate_accounts, get_local_profiles
+from ui.import_dialog import ImportConfigsDialog
 from ui.settings_dialog import SettingsDialog
 from ui.widgets import AccountComboDelegate, ConfigCard, make_avatar_pixmap
 from ui.workers import CopyWorker, FunctionRunnable
@@ -154,10 +166,16 @@ class MainWindow(QMainWindow):
         row = QHBoxLayout()
         row.setSpacing(8)
 
+        self.import_btn = QPushButton("РРјРїРѕСЂС‚РёСЂРѕРІР°С‚СЊ РєРѕРЅС„РёРіРё")
+        self.import_btn.setObjectName("SecondaryButton")
+        self.import_btn.setToolTip("РРјРїРѕСЂС‚РёСЂРѕРІР°С‚СЊ РєРѕРЅС„РёРіРё РёР· РїР°РїРѕРє СЃС‚Р°СЂРѕРіРѕ bat-СЃРєСЂРёРїС‚Р°")
+        self.import_btn.clicked.connect(self.open_import_dialog)
+        row.addWidget(self.import_btn, 0)
+
         self.save_btn = QPushButton("РЎРѕС…СЂР°РЅРёС‚СЊ С‚РµРєСѓС‰РёР№ РєРѕРЅС„РёРі")
         self.save_btn.setObjectName("PrimaryButton")
         self.save_btn.clicked.connect(self.save_current_config_dialog)
-        row.addWidget(self.save_btn, 2)
+        row.addWidget(self.save_btn, 0)
 
         self.refresh_btn = QToolButton()
         self.refresh_btn.setToolTip("РћР±РЅРѕРІРёС‚СЊ (РєРѕРЅС„РёРіРё, Р°РєРєР°СѓРЅС‚С‹, РїСЂРѕС„РёР»Рё)")
@@ -172,10 +190,12 @@ class MainWindow(QMainWindow):
         self.refresh_profiles_btn.clicked.connect(self.refresh_profiles_only)
         row.addWidget(self.refresh_profiles_btn, 0)
 
+        row.addStretch(1)
+
         self.status_label = QLabel("Р“РѕС‚РѕРІРѕ")
         self.status_label.setObjectName("StatusLabel")
         self.status_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        row.addWidget(self.status_label, 2)
+        row.addWidget(self.status_label, 0)
 
         bottom_layout.addLayout(row)
         root.addWidget(bottom)
@@ -570,9 +590,120 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.warning(self, "РћС€РёР±РєР°", f"РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РєСЂС‹С‚СЊ РїР°РїРєСѓ: {e}")
 
+    def open_import_dialog(self) -> None:
+        configs_dir = self.get_configs_dir()
+        if not configs_dir:
+            QMessageBox.warning(self, "РћС€РёР±РєР°", "РќРµ Р·Р°РґР°РЅР° РїР°РїРєР° РєРѕРЅС„РёРіРѕРІ РїСЂРёР»РѕР¶РµРЅРёСЏ.")
+            return
+        source_dir = QFileDialog.getExistingDirectory(self, "Р’С‹Р±РµСЂРёС‚Рµ РїР°РїРєСѓ СЃ РєРѕРЅС„РёРіР°РјРё РґР»СЏ РёРјРїРѕСЂС‚Р°", str(get_base_dir()))
+        if not source_dir:
+            return
+        try:
+            candidates = scan_importable_configs(source_dir)
+        except Exception as e:
+            LOGGER.exception("Failed to scan import folder %s: %s", source_dir, e)
+            QMessageBox.critical(self, "РћС€РёР±РєР°", f"РќРµ СѓРґР°Р»РѕСЃСЊ РїСЂРѕСЃРєР°РЅРёСЂРѕРІР°С‚СЊ РїР°РїРєСѓ: {e}")
+            return
+
+        if not candidates:
+            QMessageBox.information(
+                self,
+                "РРјРїРѕСЂС‚ РєРѕРЅС„РёРіРѕРІ",
+                "Р’ РІС‹Р±СЂР°РЅРЅРѕР№ РїР°РїРєРµ РЅРµ РЅР°Р№РґРµРЅРѕ РєРѕРЅС„РёРіРѕРІ (РѕР¶РёРґР°СЋС‚СЃСЏ РїРѕРґРїР°РїРєРё, СЃРѕРґРµСЂР¶Р°С‰РёРµ РїР°РїРєСѓ 570).",
+            )
+            return
+
+        dlg = ImportConfigsDialog(candidates, self)
+        if not dlg.exec():
+            return
+        selected = dlg.selected_candidates()
+        if not selected:
+            self.set_status("РРјРїРѕСЂС‚ РѕС‚РјРµРЅС‘РЅ")
+            return
+
+        imported = 0
+        replaced = 0
+        skipped = 0
+        errors = 0
+
+        for cand in selected:
+            target_name = cand.name
+            while True:
+                dest_path = Path(configs_dir) / target_name
+                if not dest_path.exists():
+                    try:
+                        import_config_folder(cand.path, configs_dir, target_name, replace=False)
+                        imported += 1
+                    except Exception as e:
+                        errors += 1
+                        LOGGER.exception("Failed to import config %s: %s", cand.path, e)
+                        QMessageBox.warning(self, "РћС€РёР±РєР° РёРјРїРѕСЂС‚Р°", f"РќРµ СѓРґР°Р»РѕСЃСЊ РёРјРїРѕСЂС‚РёСЂРѕРІР°С‚СЊ '{cand.name}': {e}")
+                    break
+
+                # Conflict: exists -> ask rename/replace/skip/cancel
+                msg = QMessageBox(self)
+                msg.setWindowTitle("РљРѕРЅС„РёРі СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚")
+                msg.setIcon(QMessageBox.Question)
+                msg.setText(f"РљРѕРЅС„РёРі '{target_name}' СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚ РІ РїР°РїРєРµ РєРѕРЅС„РёРіРѕРІ.\nР§С‚Рѕ СЃРґРµР»Р°С‚СЊ?")
+                btn_rename = msg.addButton("РџРµСЂРµРёРјРµРЅРѕРІР°С‚СЊ", QMessageBox.ActionRole)
+                btn_replace = msg.addButton("Р—Р°РјРµРЅРёС‚СЊ", QMessageBox.DestructiveRole)
+                btn_skip = msg.addButton("РџСЂРѕРїСѓСЃС‚РёС‚СЊ", QMessageBox.RejectRole)
+                btn_cancel = msg.addButton("РћС‚РјРµРЅР° РёРјРїРѕСЂС‚Р°", QMessageBox.RejectRole)
+                msg.setDefaultButton(btn_skip)
+                msg.exec()
+                clicked = msg.clickedButton()
+
+                if clicked == btn_cancel:
+                    self.refresh_configs()
+                    self.set_status(f"РРјРїРѕСЂС‚ РїСЂРµСЂРІР°РЅ: РґРѕР±Р°РІР»РµРЅРѕ {imported}, Р·Р°РјРµРЅРµРЅРѕ {replaced}, РїСЂРѕРїСѓС‰РµРЅРѕ {skipped}, РѕС€РёР±РѕРє {errors}")
+                    QMessageBox.information(self, "РРјРїРѕСЂС‚ РєРѕРЅС„РёРіРѕРІ", "РРјРїРѕСЂС‚ РїСЂРµСЂРІР°РЅ РїРѕР»СЊР·РѕРІР°С‚РµР»РµРј.")
+                    return
+                if clicked == btn_skip:
+                    skipped += 1
+                    break
+                if clicked == btn_replace:
+                    try:
+                        import_config_folder(cand.path, configs_dir, target_name, replace=True)
+                        replaced += 1
+                    except Exception as e:
+                        errors += 1
+                        LOGGER.exception("Failed to replace imported config %s: %s", cand.path, e)
+                        QMessageBox.warning(self, "РћС€РёР±РєР° РёРјРїРѕСЂС‚Р°", f"РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РјРµРЅРёС‚СЊ '{target_name}': {e}")
+                    break
+                if clicked == btn_rename:
+                    new_name, ok = QInputDialog.getText(
+                        self,
+                        "РџРµСЂРµРёРјРµРЅРѕРІР°С‚СЊ РєРѕРЅС„РёРі",
+                        f"Р’РІРµРґРёС‚Рµ РЅРѕРІРѕРµ РёРјСЏ РґР»СЏ '{cand.name}':",
+                        text=target_name,
+                    )
+                    if not ok:
+                        # return to conflict prompt
+                        continue
+                    new_name = (new_name or "").strip()
+                    fmt_ok, fmt_msg = validate_config_name_format(new_name)
+                    if not fmt_ok:
+                        QMessageBox.warning(self, "РќРµРєРѕСЂСЂРµРєС‚РЅРѕРµ РёРјСЏ", fmt_msg)
+                        continue
+                    target_name = new_name
+                    continue
+
+                # Fallback: treat as skip
+                skipped += 1
+                break
+
+        self.refresh_configs()
+        summary = f"РРјРїРѕСЂС‚ Р·Р°РІРµСЂСˆС‘РЅ: РґРѕР±Р°РІР»РµРЅРѕ {imported}, Р·Р°РјРµРЅРµРЅРѕ {replaced}, РїСЂРѕРїСѓС‰РµРЅРѕ {skipped}"
+        if errors:
+            summary += f", РѕС€РёР±РѕРє {errors}"
+        self.set_status(summary)
+        QMessageBox.information(self, "РРјРїРѕСЂС‚ РєРѕРЅС„РёРіРѕРІ", summary + ".")
+
+
     # --- Worker/progress handling ---
     def set_busy(self, busy: bool, text: str = "") -> None:
         controls = [
+            self.import_btn,
             self.save_btn,
             self.refresh_btn,
             self.refresh_profiles_btn,

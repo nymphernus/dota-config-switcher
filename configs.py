@@ -50,7 +50,7 @@ def format_size(num_bytes: int) -> str:
     return f"{int(num_bytes)} Б"
 
 
-def validate_config_name(name: str, configs_dir: str | Path) -> Tuple[bool, str]:
+def validate_config_name_format(name: str) -> Tuple[bool, str]:
     name = (name or "").strip()
     if not name:
         return False, "Имя конфига не может быть пустым."
@@ -63,6 +63,14 @@ def validate_config_name(name: str, configs_dir: str | Path) -> Tuple[bool, str]
     # Prevent path separators / traversal via weird names
     if "/" in name or "\\" in name:
         return False, "Имя конфига не должно содержать разделители пути."
+    return True, ""
+
+
+def validate_config_name(name: str, configs_dir: str | Path) -> Tuple[bool, str]:
+    name = (name or "").strip()
+    ok, msg = validate_config_name_format(name)
+    if not ok:
+        return False, msg
     target = Path(configs_dir) / name
     if target.exists():
         return False, "Конфиг с таким именем уже существует."
@@ -286,4 +294,72 @@ def open_in_explorer(path: str | Path) -> None:
         subprocess.Popen(["open", p])
     else:
         subprocess.Popen(["xdg-open", p])
+
+
+@dataclass
+class ImportCandidate:
+    name: str
+    path: str
+    modified_ts: float
+    size_bytes: int
+
+    @property
+    def modified_str(self) -> str:
+        try:
+            return datetime.fromtimestamp(self.modified_ts).strftime("%d.%m.%Y %H:%M")
+        except Exception:
+            return "—"
+
+    @property
+    def size_str(self) -> str:
+        return format_size(self.size_bytes)
+
+
+def scan_importable_configs(source_dir: str | Path) -> List[ImportCandidate]:
+    """Scan a directory for legacy/config folders containing a '570' subfolder."""
+    root = Path(source_dir)
+    result: List[ImportCandidate] = []
+    if not root.exists() or not root.is_dir():
+        return result
+    try:
+        for entry in root.iterdir():
+            try:
+                if not is_valid_config_dir(entry):
+                    continue
+                size, mtime = get_directory_stats(entry)
+                result.append(ImportCandidate(name=entry.name, path=str(entry), modified_ts=mtime, size_bytes=size))
+            except Exception as e:
+                LOGGER.warning("Failed to inspect import candidate %s: %s", entry, e)
+    except Exception as e:
+        LOGGER.exception("Failed to scan import folder %s: %s", root, e)
+        raise
+    result.sort(key=lambda c: c.name.lower())
+    return result
+
+
+def import_config_folder(src_path: str | Path, configs_dir: str | Path, target_name: str, replace: bool = False) -> Path:
+    """Copy a config folder (containing 570) into configs_dir as target_name."""
+    src = Path(src_path)
+    if not is_valid_config_dir(src):
+        raise ValueError(f"Папка '{src}' не является конфигом (нет подпапки 570).")
+
+    target_name = (target_name or "").strip()
+    ok, msg = validate_config_name_format(target_name)
+    if not ok:
+        raise ValueError(msg)
+
+    configs_dir = Path(configs_dir)
+    configs_dir.mkdir(parents=True, exist_ok=True)
+    dest = configs_dir / target_name
+
+    if dest.exists():
+        if not replace:
+            raise FileExistsError("Конфиг с таким именем уже существует.")
+        # Safety: only replace folders that look like config dirs
+        if not is_valid_config_dir(dest):
+            raise ValueError("Существующая папка с таким именем не является конфигом Dota 2 и не будет заменена.")
+        shutil.rmtree(dest)
+
+    shutil.copytree(src, dest)
+    return dest
 
