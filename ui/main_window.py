@@ -231,6 +231,25 @@ class MainWindow(QMainWindow):
         actions_row.addWidget(self.refresh_profiles_btn, 0, Qt.AlignVCenter)
 
         actions_row.addStretch(1)
+
+        self.minimize_tray_btn = QToolButton()
+        self.minimize_tray_btn.setObjectName("IconButton")
+        self.minimize_tray_btn.setIcon(self.style().standardIcon(QStyle.SP_TitleBarMinButton))
+        self.minimize_tray_btn.setIconSize(QSize(18, 18))
+        self.minimize_tray_btn.setFixedSize(32, 32)
+        self.minimize_tray_btn.setToolTip("???????? ? ????")
+        self.minimize_tray_btn.clicked.connect(self.hide)
+        actions_row.addWidget(self.minimize_tray_btn, 0, Qt.AlignVCenter)
+
+        self.exit_btn = QToolButton()
+        self.exit_btn.setObjectName("IconButton")
+        self.exit_btn.setIcon(self.style().standardIcon(QStyle.SP_TitleBarCloseButton))
+        self.exit_btn.setIconSize(QSize(18, 18))
+        self.exit_btn.setFixedSize(32, 32)
+        self.exit_btn.setToolTip("?????")
+        self.exit_btn.clicked.connect(self.quit_from_tray)
+        actions_row.addWidget(self.exit_btn, 0, Qt.AlignVCenter)
+
         bottom_layout.addLayout(actions_row)
 
         self.status_label = QLabel("Готово")
