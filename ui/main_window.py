@@ -40,7 +40,14 @@ from configs import (
     scan_importable_configs,
     validate_config_name_format,
 )
-from settings import get_base_dir, load_settings, save_settings
+from settings import (
+    get_base_dir,
+    get_default_configs_dir,
+    get_last_migration_message,
+    get_legacy_base_dir,
+    load_settings,
+    save_settings,
+)
 from steam import detect_steam_path, enumerate_accounts, get_local_profiles
 from ui.import_dialog import ImportConfigsDialog
 from ui.settings_dialog import SettingsDialog
@@ -278,6 +285,11 @@ class MainWindow(QMainWindow):
         self.refresh_configs()
         self.refresh_profiles_async(force=True)
 
+        migration_msg = get_last_migration_message()
+        if migration_msg:
+            QMessageBox.information(self, "Миграция данных", migration_msg)
+            self.set_status("Данные перенесены в AppData", "ok")
+
     def ensure_steam_path(self) -> None:
         steam_path = (self.settings_data.get("steam_path") or "").strip()
         if steam_path and Path(steam_path).exists():
@@ -471,7 +483,7 @@ class MainWindow(QMainWindow):
 
     # --- Configs ---
     def get_configs_dir(self) -> str:
-        return str(self.settings_data.get("configs_dir") or get_base_dir())
+        return str(self.settings_data.get("configs_dir") or get_default_configs_dir())
 
     def clear_config_cards(self) -> None:
         while self.cards_layout.count() > 1:
@@ -509,7 +521,7 @@ class MainWindow(QMainWindow):
 
     # --- Actions ---
     def choose_steam_path(self) -> None:
-        current = self.settings_data.get("steam_path") or str(get_base_dir())
+        current = self.settings_data.get("steam_path") or str(get_legacy_base_dir())
         path = QFileDialog.getExistingDirectory(self, "Выберите папку Steam", current)
         if not path:
             return
@@ -631,7 +643,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Не задана папка конфигов приложения.")
             self.set_status("Не задана папка конфигов", "error")
             return
-        source_dir = QFileDialog.getExistingDirectory(self, "Выберите папку с конфигами для импорта", str(get_base_dir()))
+        source_dir = QFileDialog.getExistingDirectory(self, "Выберите папку с конфигами для импорта", str(get_legacy_base_dir()))
         if not source_dir:
             return
         try:
