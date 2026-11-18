@@ -45,6 +45,7 @@ from settings import (
     get_default_configs_dir,
     get_last_migration_message,
     get_legacy_base_dir,
+    get_resource_path,
     load_settings,
     save_settings,
 )
@@ -63,6 +64,10 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("DotaConfigSwitcher")
         self.resize(800, 600)
         self.setMinimumSize(720, 520)
+
+        icon_path = get_resource_path("icon.png")
+        if icon_path.exists():
+            self.setWindowIcon(QIcon(str(icon_path)))
 
         self.settings_data: Dict[str, Any] = load_settings()
         self.accounts: List[Dict[str, Any]] = []

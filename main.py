@@ -7,9 +7,10 @@ import sys
 from logging.handlers import RotatingFileHandler
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
-from settings import APP_NAME, get_log_path
+from settings import APP_NAME, get_log_path, get_resource_path
 from ui.main_window import MainWindow
 
 
@@ -56,6 +57,10 @@ def main() -> int:
 
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
+
+    icon_path = get_resource_path("icon.png")
+    if icon_path.exists():
+        app.setWindowIcon(QIcon(str(icon_path)))
 
     window = MainWindow()
     window.show()

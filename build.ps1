@@ -18,7 +18,11 @@ if (Test-Path ".\.venv\Scripts\pyinstaller.exe") {
     $pyinstaller = ".\.venv\Scripts\pyinstaller.exe"
 }
 
-& $pyinstaller --noconfirm --clean --onefile --windowed --name "DotaConfigSwitcher" main.py
+& $pyinstaller --noconfirm --clean --onefile --windowed `
+    --name "DotaConfigSwitcher" `
+    --icon "app.ico" `
+    --add-data "icon.png;." `
+    main.py
 
 if ($LASTEXITCODE -ne 0) {
     throw "PyInstaller build failed with exit code $LASTEXITCODE"

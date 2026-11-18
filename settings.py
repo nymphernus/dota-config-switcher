@@ -75,6 +75,15 @@ def get_log_path() -> Path:
     return get_base_dir() / LOG_FILENAME
 
 
+def get_resource_path(*parts: str) -> Path:
+    """Return path to a bundled/read-only resource (works in dev and PyInstaller onefile)."""
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        base = Path(getattr(sys, "_MEIPASS"))
+    else:
+        base = Path(__file__).resolve().parent
+    return base.joinpath(*parts)
+
+
 def default_settings() -> Dict[str, Any]:
     return {
         "steam_path": "",
