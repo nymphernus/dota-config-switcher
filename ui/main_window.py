@@ -237,18 +237,9 @@ class MainWindow(QMainWindow):
         self.refresh_profiles_btn = QPushButton("Обновить профили")
         self.refresh_profiles_btn.setObjectName("SecondaryButton")
         self.refresh_profiles_btn.setIcon(self.style().standardIcon(QStyle.SP_BrowserReload))
-        self.refresh_profiles_btn.setToolTip("Перечитать локальные профили Steam (loginusers.vdf, avatarcache)")
-        self.refresh_profiles_btn.clicked.connect(self.refresh_profiles_only)
+        self.refresh_profiles_btn.setToolTip("Обновить профили, аккаунты и список конфигов")
+        self.refresh_profiles_btn.clicked.connect(self.refresh_all)
         actions_row.addWidget(self.refresh_profiles_btn, 0, Qt.AlignVCenter)
-
-        self.refresh_btn = QToolButton()
-        self.refresh_btn.setToolTip("Обновить (конфиги, аккаунты, профили)")
-        self.refresh_btn.setIcon(self.style().standardIcon(QStyle.SP_BrowserReload))
-        self.refresh_btn.setIconSize(QSize(18, 18))
-        self.refresh_btn.setFixedSize(32, 32)
-        self.refresh_btn.setObjectName("IconButton")
-        self.refresh_btn.clicked.connect(self.refresh_all)
-        actions_row.addWidget(self.refresh_btn, 0, Qt.AlignVCenter)
 
         actions_row.addStretch(1)
         bottom_layout.addLayout(actions_row)
@@ -984,7 +975,6 @@ class MainWindow(QMainWindow):
         controls = [
             self.import_btn,
             self.save_btn,
-            self.refresh_btn,
             self.refresh_profiles_btn,
             self.empty_save_btn,
             self.empty_import_btn,
