@@ -106,6 +106,14 @@ class MainWindow(QMainWindow):
         self.account_combo.currentIndexChanged.connect(self.on_account_changed)
         top_layout.addWidget(self.account_combo, 0, Qt.AlignVCenter)
 
+        self.favorite_btn = QToolButton()
+        self.favorite_btn.setObjectName("IconButton")
+        self.favorite_btn.setToolTip("Сделать профиль избранным")
+        self.favorite_btn.setText("☆")
+        self.favorite_btn.setFixedSize(32, 32)
+        self.favorite_btn.clicked.connect(self.toggle_favorite_account)
+        top_layout.addWidget(self.favorite_btn, 0, Qt.AlignVCenter)
+
         top_layout.addStretch(1)
 
         self.steam_path_label = QLabel()
@@ -286,7 +294,7 @@ class MainWindow(QMainWindow):
     def initialize_state(self) -> None:
         self.ensure_steam_path()
         self.update_steam_path_label()
-        self.refresh_accounts(select_saved=True)
+        self.refresh_accounts(select_saved=True, prefer_favorite=True)
         self.refresh_configs()
         self.refresh_profiles_async(force=True)
 
@@ -365,7 +373,7 @@ class MainWindow(QMainWindow):
         self.set_status("Профили обновлены", "ok")
 
     # --- Accounts ---
-    def refresh_accounts(self, select_saved: bool = True) -> None:
+    def refresh_accounts(self, select_saved: bool = True, prefer_favorite: bool = False) -> None:
         steam_path = self.settings_data.get("steam_path") or ""
         self.account_combo.blockSignals(True)
         self.account_combo.clear()
@@ -373,10 +381,13 @@ class MainWindow(QMainWindow):
         if not steam_path or not Path(steam_path).exists():
             self.account_combo.addItem("Steam не найден")
             self.account_combo.setEnabled(False)
+            self.favorite_btn.setEnabled(False)
             self.account_combo.blockSignals(False)
             self.profiles = {}
+            self._update_favorite_button()
             return
         self.account_combo.setEnabled(True)
+        self.favorite_btn.setEnabled(True)
         try:
             self.accounts = enumerate_accounts(steam_path)
         except Exception as e:
@@ -387,6 +398,7 @@ class MainWindow(QMainWindow):
         if not self.accounts:
             self.account_combo.addItem("Аккаунты Steam не найдены")
             self.account_combo.setEnabled(False)
+            self.favorite_btn.setEnabled(False)
             self.account_combo.blockSignals(False)
             QMessageBox.information(
                 self,
@@ -394,39 +406,68 @@ class MainWindow(QMainWindow):
                 "В папке userdata не найдено ни одного аккаунта. Запустите Steam хотя бы раз.",
             )
             self.profiles = {}
+            self._update_favorite_button()
             return
 
+        favorite_id = self._sanitize_account_id(self.settings_data.get("favorite_account_id")) or ""
+        account_ids_set = {str(a["account_id"]) for a in self.accounts}
+        if favorite_id and favorite_id not in account_ids_set:
+            favorite_id = ""
+            self.settings_data["favorite_account_id"] = ""
+            save_settings(self.settings_data)
+
+        # Favorite account first, preserve relative order for others
+        ordered_accounts = list(self.accounts)
+        if favorite_id:
+            ordered_accounts.sort(key=lambda a: 0 if str(a.get("account_id")) == favorite_id else 1)
+
         selected_id = self._sanitize_account_id(self.settings_data.get("selected_account_id")) or ""
+        desired_id = ""
+        if prefer_favorite and favorite_id:
+            desired_id = favorite_id
+        elif select_saved and selected_id:
+            desired_id = selected_id
+        elif favorite_id:
+            desired_id = favorite_id
+
         selected_index = 0
-        for i, acc in enumerate(self.accounts):
+        for i, acc in enumerate(ordered_accounts):
             aid = str(acc["account_id"])
-            display_name = aid
+            is_fav = (aid == favorite_id and bool(favorite_id))
+            base_name = aid
             if not acc.get("has_dota", False):
-                display_name += " (нет Dota 2)"
-            self.account_combo.addItem(make_avatar_pixmap(None, name=display_name, account_id=aid), display_name)
+                base_name += " (нет Dota 2)"
+            display_name = f"★ {base_name}" if is_fav else base_name
+            self.account_combo.addItem(make_avatar_pixmap(None, name=base_name, account_id=aid), display_name)
             self.account_combo.setItemData(i, display_name, Qt.UserRole)
             self.account_combo.setItemData(i, aid, Qt.UserRole + 1)
             self.account_combo.setItemData(i, None, Qt.UserRole + 2)
-            if select_saved and selected_id and aid == selected_id:
+            self.account_combo.setItemData(i, is_fav, Qt.UserRole + 3)
+            if desired_id and aid == desired_id:
                 selected_index = i
 
-        if not selected_id and self.accounts:
+        if desired_id and all(str(a["account_id"]) != desired_id for a in ordered_accounts):
+            desired_id = favorite_id or str(ordered_accounts[0]["account_id"])
             selected_index = 0
-            self.settings_data["selected_account_id"] = str(self.accounts[0]["account_id"])
-            save_settings(self.settings_data)
-        elif selected_id and all(str(a["account_id"]) != selected_id for a in self.accounts):
-            self.settings_data["selected_account_id"] = str(self.accounts[0]["account_id"])
-            save_settings(self.settings_data)
+            for i, acc in enumerate(ordered_accounts):
+                if str(acc["account_id"]) == desired_id:
+                    selected_index = i
+                    break
+
+        if not desired_id and ordered_accounts:
+            desired_id = str(ordered_accounts[0]["account_id"])
             selected_index = 0
-        elif selected_id and str(self.settings_data.get("selected_account_id") or "") != selected_id:
-            self.settings_data["selected_account_id"] = selected_id
-            save_settings(self.settings_data)
+
+        self.settings_data["selected_account_id"] = desired_id or ""
+        save_settings(self.settings_data)
 
         self.account_combo.setCurrentIndex(selected_index)
         self.account_combo.blockSignals(False)
         self.update_account_combo_display()
+        self._update_favorite_button()
 
     def update_account_combo_display(self) -> None:
+        favorite_id = self._sanitize_account_id(self.settings_data.get("favorite_account_id")) or ""
         for i in range(self.account_combo.count()):
             aid_raw = self.account_combo.itemData(i, Qt.UserRole + 1)
             if not aid_raw:
@@ -434,11 +475,15 @@ class MainWindow(QMainWindow):
             aid = self._sanitize_account_id(aid_raw)
             if not aid:
                 continue
+            is_fav = (aid == favorite_id and bool(favorite_id))
             prof = self.profiles.get(aid, {})
-            name = prof.get("personaname") or aid
+            persona = prof.get("personaname") or aid
             acc = next((a for a in self.accounts if str(a["account_id"]) == aid), None)
+            display_name = persona
             if acc and not acc.get("has_dota", False):
-                name = f"{name} (нет Dota 2)"
+                display_name = f"{display_name} (нет Dota 2)"
+            if is_fav:
+                display_name = f"★ {display_name}"
             avatar_path = prof.get("avatar_path")
             source = prof.get("source")
             if source == "loginusers.vdf":
@@ -447,12 +492,16 @@ class MainWindow(QMainWindow):
                 tooltip = f"Никнейм: из localconfig.vdf\nAccountID: {aid}"
             else:
                 tooltip = f"Никнейм: не найдено (используется AccountID)\nAccountID: {aid}"
-            self.account_combo.setItemIcon(i, QIcon(make_avatar_pixmap(avatar_path, 32, 8, name=name, account_id=aid)))
-            self.account_combo.setItemData(i, name, Qt.UserRole)
+            if is_fav:
+                tooltip = "Избранный профиль\n" + tooltip
+            self.account_combo.setItemIcon(i, QIcon(make_avatar_pixmap(avatar_path, 32, 8, name=persona, account_id=aid)))
+            self.account_combo.setItemData(i, display_name, Qt.UserRole)
             self.account_combo.setItemData(i, aid, Qt.UserRole + 1)
             self.account_combo.setItemData(i, avatar_path, Qt.UserRole + 2)
+            self.account_combo.setItemData(i, is_fav, Qt.UserRole + 3)
             self.account_combo.setItemData(i, tooltip, Qt.ToolTipRole)
-            self.account_combo.setItemText(i, name)
+            self.account_combo.setItemText(i, display_name)
+        self._update_favorite_button()
 
     def refresh_profiles_async(self, force: bool = False) -> None:
         if not self.accounts:
@@ -484,7 +533,36 @@ class MainWindow(QMainWindow):
         if aid:
             self.settings_data["selected_account_id"] = aid
             save_settings(self.settings_data)
+        self._update_favorite_button()
         self.refresh_configs()
+
+    def _update_favorite_button(self) -> None:
+        selected = self.get_selected_account_id()
+        favorite = self._sanitize_account_id(self.settings_data.get("favorite_account_id")) or ""
+        has_accounts = self.account_combo.isEnabled() and self.account_combo.count() > 0 and bool(selected)
+        self.favorite_btn.setEnabled(has_accounts)
+        if selected and favorite and selected == favorite:
+            self.favorite_btn.setText("★")
+            self.favorite_btn.setToolTip("Убрать профиль из избранного")
+        else:
+            self.favorite_btn.setText("☆")
+            self.favorite_btn.setToolTip("Сделать профиль избранным")
+
+    def toggle_favorite_account(self) -> None:
+        aid = self.get_selected_account_id()
+        if not aid:
+            return
+        current_fav = self._sanitize_account_id(self.settings_data.get("favorite_account_id")) or ""
+        if current_fav == aid:
+            self.settings_data["favorite_account_id"] = ""
+            self.set_status("Профиль убран из избранного", "info")
+        else:
+            self.settings_data["favorite_account_id"] = aid
+            self.set_status("Профиль добавлен в избранное", "ok")
+        save_settings(self.settings_data)
+        # Rebuild list so favorite is first; keep current selection
+        self.settings_data["selected_account_id"] = aid
+        self.refresh_accounts(select_saved=True, prefer_favorite=False)
 
     # --- Configs ---
     def get_configs_dir(self) -> str:
@@ -763,6 +841,7 @@ class MainWindow(QMainWindow):
             self.empty_import_btn,
             self.change_path_btn,
             self.settings_btn,
+            self.favorite_btn,
             self.account_combo,
         ]
         for w in controls:
