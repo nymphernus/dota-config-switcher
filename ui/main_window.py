@@ -11,14 +11,15 @@ from PySide6.QtGui import QAction, QCloseEvent, QFontMetrics, QIcon
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
+    QDialog,
+    QDialogButtonBox,
     QFileDialog,
     QFrame,
     QHBoxLayout,
-    QInputDialog,
     QLabel,
+    QLineEdit,
     QMainWindow,
     QMenu,
-    QMessageBox,
     QProgressBar,
     QPushButton,
     QScrollArea,
@@ -54,7 +55,16 @@ from settings import (
 from steam import detect_steam_path, enumerate_accounts, get_local_profiles
 from ui.import_dialog import ImportConfigsDialog
 from ui.settings_dialog import SettingsDialog
-from ui.widgets import AccountComboDelegate, ConfigCard, make_avatar_pixmap
+from ui.widgets import (
+    AccountComboDelegate,
+    ConfigCard,
+    RenameDialog,
+    ask_yes_no,
+    make_avatar_pixmap,
+    show_error,
+    show_info,
+    show_warning,
+)
 from ui.workers import CopyWorker, FunctionRunnable
 
 LOGGER = logging.getLogger(__name__)
@@ -126,7 +136,7 @@ class MainWindow(QMainWindow):
 
         self.change_path_btn = QToolButton()
         self.change_path_btn.setObjectName("IconButton")
-        self.change_path_btn.setToolTip("Выбрать папку Steam")
+        self.change_path_btn.setToolTip("\u0412\u044b\u0431\u0440\u0430\u0442\u044c \u043f\u0430\u043f\u043a\u0443 Steam")
         self.change_path_btn.setIcon(self.style().standardIcon(QStyle.SP_DirOpenIcon))
         self.change_path_btn.setIconSize(QSize(18, 18))
         self.change_path_btn.setFixedSize(32, 32)
@@ -135,8 +145,8 @@ class MainWindow(QMainWindow):
 
         self.settings_btn = QToolButton()
         self.settings_btn.setObjectName("IconButton")
-        self.settings_btn.setToolTip("Настройки")
-        self.settings_btn.setText("⚙")
+        self.settings_btn.setToolTip("\u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438")
+        self.settings_btn.setText("\u2699")
         self.settings_btn.setFixedSize(32, 32)
         self.settings_btn.clicked.connect(self.open_settings_dialog)
         top_layout.addWidget(self.settings_btn, 0, Qt.AlignVCenter)
@@ -237,7 +247,7 @@ class MainWindow(QMainWindow):
         self.minimize_tray_btn.setIcon(self.style().standardIcon(QStyle.SP_TitleBarMinButton))
         self.minimize_tray_btn.setIconSize(QSize(18, 18))
         self.minimize_tray_btn.setFixedSize(32, 32)
-        self.minimize_tray_btn.setToolTip("???????? ? ????")
+        self.minimize_tray_btn.setToolTip("\u0421\u0432\u0435\u0440\u043d\u0443\u0442\u044c \u0432 \u0442\u0440\u0435\u0439")
         self.minimize_tray_btn.clicked.connect(self.hide)
         actions_row.addWidget(self.minimize_tray_btn, 0, Qt.AlignVCenter)
 
@@ -246,7 +256,7 @@ class MainWindow(QMainWindow):
         self.exit_btn.setIcon(self.style().standardIcon(QStyle.SP_TitleBarCloseButton))
         self.exit_btn.setIconSize(QSize(18, 18))
         self.exit_btn.setFixedSize(32, 32)
-        self.exit_btn.setToolTip("?????")
+        self.exit_btn.setToolTip("\u0412\u044b\u0445\u043e\u0434")
         self.exit_btn.clicked.connect(self.quit_from_tray)
         actions_row.addWidget(self.exit_btn, 0, Qt.AlignVCenter)
 
@@ -294,7 +304,6 @@ class MainWindow(QMainWindow):
             QMenu { background-color: #252536; color: #e6e6f0; border: 1px solid #3a3a4d; }
             QMenu::item:selected { background-color: #3a4a6a; }
             QMenu::separator { height: 1px; background: #3a3a4d; margin: 4px 6px; }
-            QMessageBox QLabel { color: #e6e6f0; }
             QLineEdit { background-color: #2a2a3a; border: 1px solid #3a3a4d; border-radius: 6px; padding: 6px; }
             """
         )
@@ -309,8 +318,8 @@ class MainWindow(QMainWindow):
 
         migration_msg = get_last_migration_message()
         if migration_msg:
-            QMessageBox.information(self, "Миграция данных", migration_msg)
-            self.set_status("Данные перенесены в AppData", "ok")
+            show_info(self, "\u041c\u0438\u0433\u0440\u0430\u0446\u0438\u044f \u0434\u0430\u043d\u043d\u044b\u0445", migration_msg)
+            self.set_status("\u0414\u0430\u043d\u043d\u044b\u0435 \u043f\u0435\u0440\u0435\u043d\u0435\u0441\u0435\u043d\u044b \u0432 AppData", "ok")
 
         self._update_tray_menu()
         self._update_tray_tooltip()
@@ -325,11 +334,11 @@ class MainWindow(QMainWindow):
             save_settings(self.settings_data)
             self.set_status(f"Найден Steam: {detected}", "ok")
             return
-        self.set_status("Steam не найден", "error")
-        QMessageBox.information(
+        self.set_status("Steam \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d", "error")
+        show_info(
             self,
-            "Steam не найден",
-            "Не удалось автоматически определить путь к Steam. Укажите папку Steam вручную.",
+            "Steam \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d",
+            "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0438 \u043e\u043f\u0440\u0435\u0434\u0435\u043b\u0438\u0442\u044c \u043f\u0443\u0442\u044c \u043a Steam. \u0423\u043a\u0430\u0436\u0438\u0442\u0435 \u043f\u0430\u043f\u043a\u0443 Steam \u0432\u0440\u0443\u0447\u043d\u0443\u044e.",
         )
         self.choose_steam_path()
 
@@ -392,14 +401,14 @@ class MainWindow(QMainWindow):
             self.accounts = []
 
         if not self.accounts:
-            self.account_combo.addItem("Аккаунты Steam не найдены")
+            self.account_combo.addItem("\u0410\u043a\u043a\u0430\u0443\u043d\u0442\u044b Steam \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u044b")
             self.account_combo.setEnabled(False)
             self.favorite_btn.setEnabled(False)
             self.account_combo.blockSignals(False)
-            QMessageBox.information(
+            show_info(
                 self,
-                "Аккаунты не найдены",
-                "В папке userdata не найдено ни одного аккаунта. Запустите Steam хотя бы раз.",
+                "\u0410\u043a\u043a\u0430\u0443\u043d\u0442\u044b \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u044b",
+                "\u0412 \u043f\u0430\u043f\u043a\u0435 userdata \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u043e \u043d\u0438 \u043e\u0434\u043d\u043e\u0433\u043e \u0430\u043a\u043a\u0430\u0443\u043d\u0442\u0430. \u0417\u0430\u043f\u0443\u0441\u0442\u0438\u0442\u0435 Steam \u0445\u043e\u0442\u044f \u0431\u044b \u0440\u0430\u0437.",
             )
             self.profiles = {}
             self._update_favorite_button()
@@ -584,8 +593,8 @@ class MainWindow(QMainWindow):
                 configs = list_configs(configs_dir)
         except Exception as e:
             LOGGER.exception("Failed to list configs: %s", e)
-            self.set_status("Ошибка чтения конфигов", "error")
-            QMessageBox.warning(self, "Ошибка", f"Не удалось прочитать список конфигов: {e}")
+            self.set_status("\u041e\u0448\u0438\u0431\u043a\u0430 \u0447\u0442\u0435\u043d\u0438\u044f \u043a\u043e\u043d\u0444\u0438\u0433\u043e\u0432", "error")
+            show_warning(self, "\u041e\u0448\u0438\u0431\u043a\u0430", f"\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043f\u0440\u043e\u0447\u0438\u0442\u0430\u0442\u044c \u0441\u043f\u0438\u0441\u043e\u043a \u043a\u043e\u043d\u0444\u0438\u0433\u043e\u0432: {e}")
             configs = []
 
         self.configs_cache = configs
@@ -633,13 +642,13 @@ class MainWindow(QMainWindow):
     def validate_ready_for_ops(self) -> Optional[tuple[str, str]]:
         steam_path = self.settings_data.get("steam_path") or ""
         if not steam_path or not Path(steam_path).exists():
-            QMessageBox.warning(self, "Ошибка", "Путь к Steam не задан или не найден.")
-            self.set_status("Путь к Steam не задан", "error")
+            show_warning(self, "\u041e\u0448\u0438\u0431\u043a\u0430", "\u041f\u0443\u0442\u044c \u043a Steam \u043d\u0435 \u0437\u0430\u0434\u0430\u043d \u0438\u043b\u0438 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d.")
+            self.set_status("\u041f\u0443\u0442\u044c \u043a Steam \u043d\u0435 \u0437\u0430\u0434\u0430\u043d", "error")
             return None
         account_id = self.get_selected_account_id()
         if not account_id:
-            QMessageBox.warning(self, "Ошибка", "Не выбран аккаунт Steam.")
-            self.set_status("Не выбран аккаунт Steam", "error")
+            show_warning(self, "\u041e\u0448\u0438\u0431\u043a\u0430", "\u041d\u0435 \u0432\u044b\u0431\u0440\u0430\u043d \u0430\u043a\u043a\u0430\u0443\u043d\u0442 Steam.")
+            self.set_status("\u041d\u0435 \u0432\u044b\u0431\u0440\u0430\u043d \u0430\u043a\u043a\u0430\u0443\u043d\u0442 Steam", "error")
             return None
         return steam_path, account_id
 
@@ -649,14 +658,18 @@ class MainWindow(QMainWindow):
             return
         steam_path, account_id = ready
         configs_dir = self.get_configs_dir()
-        name, ok = QInputDialog.getText(self, "Сохранить текущий конфиг", "Введите имя конфига:")
+        name, ok = RenameDialog.get_text(
+            self,
+            "\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0442\u0435\u043a\u0443\u0449\u0438\u0439 \u043a\u043e\u043d\u0444\u0438\u0433",
+            "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0438\u043c\u044f \u043a\u043e\u043d\u0444\u0438\u0433\u0430:",
+        )
         if not ok:
             return
         name = (name or "").strip()
         from configs import validate_config_name
         valid, msg = validate_config_name(name, configs_dir)
         if not valid:
-            QMessageBox.warning(self, "Некорректное имя", msg)
+            show_warning(self, "\u041d\u0435\u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u043e\u0435 \u0438\u043c\u044f", msg)
             return
 
         self.start_worker(
@@ -665,8 +678,8 @@ class MainWindow(QMainWindow):
             account_id,
             configs_dir,
             name,
-            busy_text="Сохранение конфига...",
-            success_message=f"Конфиг '{name}' сохранён",
+            busy_text="\u0421\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u0435 \u043a\u043e\u043d\u0444\u0438\u0433\u0430...",
+            success_message=f"\u041a\u043e\u043d\u0444\u0438\u0433 '{name}' \u0441\u043e\u0445\u0440\u0430\u043d\u0451\u043d",
             on_success=lambda _p: self.refresh_configs(),
         )
 
@@ -676,52 +689,48 @@ class MainWindow(QMainWindow):
             return
         steam_path, account_id = ready
         cfg_name = Path(config_path).name
-        reply = QMessageBox.question(
+        confirmed = ask_yes_no(
             self,
-            "Применить конфиг",
-            f"Применить конфиг '{cfg_name}' для выбранного аккаунта?\n\n"
-            f"Текущие файлы в userdata\\{account_id}\\570 будут заменены.",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
+            "\u041f\u0440\u0438\u043c\u0435\u043d\u0438\u0442\u044c \u043a\u043e\u043d\u0444\u0438\u0433",
+            f"\u041f\u0440\u0438\u043c\u0435\u043d\u0438\u0442\u044c \u043a\u043e\u043d\u0444\u0438\u0433 '{cfg_name}' \u0434\u043b\u044f \u0432\u044b\u0431\u0440\u0430\u043d\u043d\u043e\u0433\u043e \u0430\u043a\u043a\u0430\u0443\u043d\u0442\u0430?\n\n"
+            f"\u0422\u0435\u043a\u0443\u0449\u0438\u0435 \u0444\u0430\u0439\u043b\u044b \u0432 userdata\\{account_id}\\570 \u0431\u0443\u0434\u0443\u0442 \u0437\u0430\u043c\u0435\u043d\u0435\u043d\u044b.",
         )
-        if reply != QMessageBox.Yes:
+        if not confirmed:
             return
         self.start_worker(
             apply_config,
             config_path,
             steam_path,
             account_id,
-            busy_text=f"Применение '{cfg_name}'...",
-            success_message=f"Конфиг '{cfg_name}' применён",
+            busy_text=f"\u041f\u0440\u0438\u043c\u0435\u043d\u0435\u043d\u0438\u0435 '{cfg_name}'...",
+            success_message=f"\u041a\u043e\u043d\u0444\u0438\u0433 '{cfg_name}' \u043f\u0440\u0438\u043c\u0435\u043d\u0451\u043d",
             on_success=lambda _p, n=cfg_name: self._record_last_applied_config(n),
         )
 
     def confirm_delete_config(self, config_path: str) -> None:
         name = Path(config_path).name
-        reply = QMessageBox.question(
+        confirmed = ask_yes_no(
             self,
-            "Удалить конфиг",
-            f"Удалить конфиг '{name}'?\nЭто действие нельзя отменить.",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
+            "\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u043a\u043e\u043d\u0444\u0438\u0433",
+            f"\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u043a\u043e\u043d\u0444\u0438\u0433 '{name}'?\n\u042d\u0442\u043e \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0435 \u043d\u0435\u043b\u044c\u0437\u044f \u043e\u0442\u043c\u0435\u043d\u0438\u0442\u044c.",
         )
-        if reply != QMessageBox.Yes:
+        if not confirmed:
             return
         try:
             delete_config(config_path)
-            self.set_status(f"Конфиг '{name}' удалён", "ok")
+            self.set_status(f"\u041a\u043e\u043d\u0444\u0438\u0433 '{name}' \u0443\u0434\u0430\u043b\u0451\u043d", "ok")
             self.refresh_configs()
         except Exception as e:
             LOGGER.exception("Failed to delete config %s: %s", config_path, e)
-            self.set_status("Ошибка удаления конфига", "error")
-            QMessageBox.critical(self, "Ошибка", f"Не удалось удалить конфиг: {e}")
+            self.set_status("\u041e\u0448\u0438\u0431\u043a\u0430 \u0443\u0434\u0430\u043b\u0435\u043d\u0438\u044f \u043a\u043e\u043d\u0444\u0438\u0433\u0430", "error")
+            show_error(self, "\u041e\u0448\u0438\u0431\u043a\u0430", f"\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0443\u0434\u0430\u043b\u0438\u0442\u044c \u043a\u043e\u043d\u0444\u0438\u0433: {e}")
 
     def open_config_folder(self, config_path: str) -> None:
         try:
             open_in_explorer(config_path)
         except Exception as e:
-            QMessageBox.warning(self, "Ошибка", f"Не удалось открыть папку: {e}")
-            self.set_status("Не удалось открыть папку", "error")
+            show_warning(self, "\u041e\u0448\u0438\u0431\u043a\u0430", f"\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u0442\u043a\u0440\u044b\u0442\u044c \u043f\u0430\u043f\u043a\u0443: {e}")
+            self.set_status("\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u0442\u043a\u0440\u044b\u0442\u044c \u043f\u0430\u043f\u043a\u0443", "error")
 
 
     def _record_last_applied_config(self, config_name: str) -> None:
@@ -809,13 +818,17 @@ class MainWindow(QMainWindow):
         old_path = Path(config_path)
         old_name = old_path.name
         if not configs_dir:
-            QMessageBox.warning(self, "??????????????", "????? ???????? ?? ??????.")
+            show_warning(
+                self,
+                "\u041f\u0435\u0440\u0435\u0438\u043c\u0435\u043d\u043e\u0432\u0430\u043d\u0438\u0435",
+                "\u041f\u0430\u043f\u043a\u0430 \u043a\u043e\u043d\u0444\u0438\u0433\u043e\u0432 \u043d\u0435 \u0437\u0430\u0434\u0430\u043d\u0430.",
+            )
             return
 
-        new_name, ok = QInputDialog.getText(
+        new_name, ok = RenameDialog.get_text(
             self,
-            "????????????? ??????",
-            "????? ???:",
+            "\u041f\u0435\u0440\u0435\u0438\u043c\u0435\u043d\u043e\u0432\u0430\u0442\u044c \u043a\u043e\u043d\u0444\u0438\u0433",
+            "\u041d\u043e\u0432\u043e\u0435 \u0438\u043c\u044f:",
             text=old_name,
         )
         if not ok:
@@ -826,7 +839,7 @@ class MainWindow(QMainWindow):
 
         fmt_ok, fmt_msg = validate_config_name_format(new_name)
         if not fmt_ok:
-            QMessageBox.warning(self, "??????????????", fmt_msg)
+            show_warning(self, "\u041d\u0435\u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u043e\u0435 \u0438\u043c\u044f", fmt_msg)
             return
 
         target_path = Path(configs_dir) / new_name
@@ -836,24 +849,28 @@ class MainWindow(QMainWindow):
             except Exception:
                 same = str(target_path).lower() == str(old_path).lower()
             if not same:
-                QMessageBox.warning(self, "??????????????", "?????? ? ????? ?????? ??? ??????????.")
+                show_warning(
+                    self,
+                    "\u041f\u0435\u0440\u0435\u0438\u043c\u0435\u043d\u043e\u0432\u0430\u043d\u0438\u0435",
+                    "\u041a\u043e\u043d\u0444\u0438\u0433 \u0441 \u0442\u0430\u043a\u0438\u043c \u0438\u043c\u0435\u043d\u0435\u043c \u0443\u0436\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442.",
+                )
                 return
 
         try:
             old_path.rename(target_path)
         except Exception as e:
             LOGGER.exception("Failed to rename config %s -> %s: %s", old_path, target_path, e)
-            QMessageBox.critical(self, "??????", f"?? ??????? ????????????? ??????: {e}")
-            self.set_status("?????? ??????????????", "error")
+            show_error(self, "\u041e\u0448\u0438\u0431\u043a\u0430", f"\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043f\u0435\u0440\u0435\u0438\u043c\u0435\u043d\u043e\u0432\u0430\u0442\u044c \u043a\u043e\u043d\u0444\u0438\u0433: {e}")
+            self.set_status("\u041e\u0448\u0438\u0431\u043a\u0430 \u043f\u0435\u0440\u0435\u0438\u043c\u0435\u043d\u043e\u0432\u0430\u043d\u0438\u044f", "error")
             return
 
-        if str(self.settings_data.get("last_applied_config_name") or "") == old_name:
-            self.settings_data["last_applied_config_name"] = new_name
+        if str(self.settings_data.get("last_applied_config") or "") == old_name:
+            self.settings_data["last_applied_config"] = new_name
             save_settings(self.settings_data)
             self._update_tray_tooltip()
 
         self.refresh_configs()
-        self.set_status(f"?????? ????????????: {new_name}", "ok")
+        self.set_status(f"\u041a\u043e\u043d\u0444\u0438\u0433 \u043f\u0435\u0440\u0435\u0438\u043c\u0435\u043d\u043e\u0432\u0430\u043d: {new_name}", "ok")
 
 
     def quick_apply_config_from_tray(self, config_path: str, config_name: str) -> None:
@@ -893,27 +910,27 @@ class MainWindow(QMainWindow):
     def open_import_dialog(self) -> None:
         configs_dir = self.get_configs_dir()
         if not configs_dir:
-            QMessageBox.warning(self, "Ошибка", "Не задана папка конфигов приложения.")
-            self.set_status("Не задана папка конфигов", "error")
+            show_warning(self, "\u041e\u0448\u0438\u0431\u043a\u0430", "\u041d\u0435 \u0437\u0430\u0434\u0430\u043d\u0430 \u043f\u0430\u043f\u043a\u0430 \u043a\u043e\u043d\u0444\u0438\u0433\u043e\u0432 \u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u044f.")
+            self.set_status("\u041d\u0435 \u0437\u0430\u0434\u0430\u043d\u0430 \u043f\u0430\u043f\u043a\u0430 \u043a\u043e\u043d\u0444\u0438\u0433\u043e\u0432", "error")
             return
-        source_dir = QFileDialog.getExistingDirectory(self, "Выберите папку с конфигами для импорта", str(get_legacy_base_dir()))
+        source_dir = QFileDialog.getExistingDirectory(self, "\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043f\u0430\u043f\u043a\u0443 \u0441 \u043a\u043e\u043d\u0444\u0438\u0433\u0430\u043c\u0438 \u0434\u043b\u044f \u0438\u043c\u043f\u043e\u0440\u0442\u0430", str(get_legacy_base_dir()))
         if not source_dir:
             return
         try:
             candidates = scan_importable_configs(source_dir)
         except Exception as e:
             LOGGER.exception("Failed to scan import folder %s: %s", source_dir, e)
-            self.set_status("Ошибка сканирования папки импорта", "error")
-            QMessageBox.critical(self, "Ошибка", f"Не удалось просканировать папку: {e}")
+            self.set_status("\u041e\u0448\u0438\u0431\u043a\u0430 \u0441\u043a\u0430\u043d\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u044f \u043f\u0430\u043f\u043a\u0438 \u0438\u043c\u043f\u043e\u0440\u0442\u0430", "error")
+            show_error(self, "\u041e\u0448\u0438\u0431\u043a\u0430", f"\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043f\u0440\u043e\u0441\u043a\u0430\u043d\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u043f\u0430\u043f\u043a\u0443: {e}")
             return
 
         if not candidates:
-            QMessageBox.information(
+            show_info(
                 self,
-                "Импорт конфигов",
-                "В выбранной папке не найдено конфигов (ожидаются подпапки, содержащие папку 570).",
+                "\u0418\u043c\u043f\u043e\u0440\u0442 \u043a\u043e\u043d\u0444\u0438\u0433\u043e\u0432",
+                "\u0412 \u0432\u044b\u0431\u0440\u0430\u043d\u043d\u043e\u0439 \u043f\u0430\u043f\u043a\u0435 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u043e \u043a\u043e\u043d\u0444\u0438\u0433\u043e\u0432 (\u043e\u0436\u0438\u0434\u0430\u044e\u0442\u0441\u044f \u043f\u043e\u0434\u043f\u0430\u043f\u043a\u0438, \u0441\u043e\u0434\u0435\u0440\u0436\u0430\u0449\u0438\u0435 \u043f\u0430\u043f\u043a\u0443 570).",
             )
-            self.set_status("Конфиги для импорта не найдены", "info")
+            self.set_status("\u041a\u043e\u043d\u0444\u0438\u0433\u0438 \u0434\u043b\u044f \u0438\u043c\u043f\u043e\u0440\u0442\u0430 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u044b", "info")
             return
 
         dlg = ImportConfigsDialog(candidates, self)
@@ -940,44 +957,68 @@ class MainWindow(QMainWindow):
                     except Exception as e:
                         errors += 1
                         LOGGER.exception("Failed to import config %s: %s", cand.path, e)
-                        QMessageBox.warning(self, "Ошибка импорта", f"Не удалось импортировать '{cand.name}': {e}")
+                        show_warning(self, "\u041e\u0448\u0438\u0431\u043a\u0430 \u0438\u043c\u043f\u043e\u0440\u0442\u0430", f"\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0438\u043c\u043f\u043e\u0440\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c '{cand.name}': {e}")
                     break
 
-                msg = QMessageBox(self)
-                msg.setWindowTitle("Конфиг уже существует")
-                msg.setIcon(QMessageBox.Question)
-                msg.setText(f"Конфиг '{target_name}' уже существует в папке конфигов.\nЧто сделать?")
-                btn_rename = msg.addButton("Переименовать", QMessageBox.ActionRole)
-                btn_replace = msg.addButton("Заменить", QMessageBox.DestructiveRole)
-                btn_skip = msg.addButton("Пропустить", QMessageBox.RejectRole)
-                btn_cancel = msg.addButton("Отмена импорта", QMessageBox.RejectRole)
-                msg.setDefaultButton(btn_skip)
-                msg.exec()
-                clicked = msg.clickedButton()
+                conflict_dlg = QDialog(self)
+                conflict_dlg.setWindowTitle("\u041a\u043e\u043d\u0444\u0438\u0433 \u0443\u0436\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442")
+                conflict_dlg.setModal(True)
+                if hasattr(self, "styleSheet") and self.styleSheet():
+                    conflict_dlg.setStyleSheet(self.styleSheet())
+                conflict_layout = QVBoxLayout(conflict_dlg)
+                conflict_layout.setContentsMargins(16, 16, 16, 16)
+                conflict_layout.setSpacing(12)
+                conflict_label = QLabel(
+                    f"\u041a\u043e\u043d\u0444\u0438\u0433 '{target_name}' \u0443\u0436\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442 \u0432 \u043f\u0430\u043f\u043a\u0435 \u043a\u043e\u043d\u0444\u0438\u0433\u043e\u0432.\n\u0427\u0442\u043e \u0441\u0434\u0435\u043b\u0430\u0442\u044c?"
+                )
+                conflict_label.setWordWrap(True)
+                conflict_layout.addWidget(conflict_label)
+                conflict_buttons = QHBoxLayout()
+                conflict_buttons.setSpacing(8)
+                conflict_buttons.addStretch(1)
+                btn_rename = QPushButton("\u041f\u0435\u0440\u0435\u0438\u043c\u0435\u043d\u043e\u0432\u0430\u0442\u044c")
+                btn_replace = QPushButton("\u0417\u0430\u043c\u0435\u043d\u0438\u0442\u044c")
+                btn_skip = QPushButton("\u041f\u0440\u043e\u043f\u0443\u0441\u0442\u0438\u0442\u044c")
+                btn_cancel = QPushButton("\u041e\u0442\u043c\u0435\u043d\u0430 \u0438\u043c\u043f\u043e\u0440\u0442\u0430")
+                for b in (btn_rename, btn_replace, btn_skip, btn_cancel):
+                    conflict_buttons.addWidget(b)
+                conflict_layout.addLayout(conflict_buttons)
+                choice = {"value": "skip"}
 
-                if clicked == btn_cancel:
+                def _set_choice(val: str):
+                    choice["value"] = val
+                    conflict_dlg.accept()
+
+                btn_rename.clicked.connect(lambda: _set_choice("rename"))
+                btn_replace.clicked.connect(lambda: _set_choice("replace"))
+                btn_skip.clicked.connect(lambda: _set_choice("skip"))
+                btn_cancel.clicked.connect(lambda: _set_choice("cancel"))
+                conflict_dlg.exec()
+                clicked = choice["value"]
+
+                if clicked == "cancel":
                     self.refresh_configs()
-                    summary = f"Импорт прерван: добавлено {imported}, заменено {replaced}, пропущено {skipped}, ошибок {errors}"
+                    summary = f"\u0418\u043c\u043f\u043e\u0440\u0442 \u043f\u0440\u0435\u0440\u0432\u0430\u043d: \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u043e {imported}, \u0437\u0430\u043c\u0435\u043d\u0435\u043d\u043e {replaced}, \u043f\u0440\u043e\u043f\u0443\u0449\u0435\u043d\u043e {skipped}, \u043e\u0448\u0438\u0431\u043e\u043a {errors}"
                     self.set_status(summary, "info")
-                    QMessageBox.information(self, "Импорт конфигов", "Импорт прерван пользователем.")
+                    show_info(self, "\u0418\u043c\u043f\u043e\u0440\u0442 \u043a\u043e\u043d\u0444\u0438\u0433\u043e\u0432", "\u0418\u043c\u043f\u043e\u0440\u0442 \u043f\u0440\u0435\u0440\u0432\u0430\u043d \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u0435\u043c.")
                     return
-                if clicked == btn_skip:
+                if clicked == "skip":
                     skipped += 1
                     break
-                if clicked == btn_replace:
+                if clicked == "replace":
                     try:
                         import_config_folder(cand.path, configs_dir, target_name, replace=True)
                         replaced += 1
                     except Exception as e:
                         errors += 1
                         LOGGER.exception("Failed to replace imported config %s: %s", cand.path, e)
-                        QMessageBox.warning(self, "Ошибка импорта", f"Не удалось заменить '{target_name}': {e}")
+                        show_warning(self, "\u041e\u0448\u0438\u0431\u043a\u0430 \u0438\u043c\u043f\u043e\u0440\u0442\u0430", f"\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0437\u0430\u043c\u0435\u043d\u0438\u0442\u044c '{target_name}': {e}")
                     break
-                if clicked == btn_rename:
-                    new_name, ok = QInputDialog.getText(
+                if clicked == "rename":
+                    new_name, ok = RenameDialog.get_text(
                         self,
-                        "Переименовать конфиг",
-                        f"Введите новое имя для '{cand.name}':",
+                        "\u041f\u0435\u0440\u0435\u0438\u043c\u0435\u043d\u043e\u0432\u0430\u0442\u044c \u043a\u043e\u043d\u0444\u0438\u0433",
+                        f"\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043d\u043e\u0432\u043e\u0435 \u0438\u043c\u044f \u0434\u043b\u044f '{cand.name}':",
                         text=target_name,
                     )
                     if not ok:
@@ -985,7 +1026,7 @@ class MainWindow(QMainWindow):
                     new_name = (new_name or "").strip()
                     fmt_ok, fmt_msg = validate_config_name_format(new_name)
                     if not fmt_ok:
-                        QMessageBox.warning(self, "Некорректное имя", fmt_msg)
+                        show_warning(self, "\u041d\u0435\u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u043e\u0435 \u0438\u043c\u044f", fmt_msg)
                         continue
                     target_name = new_name
                     continue
@@ -994,11 +1035,11 @@ class MainWindow(QMainWindow):
                 break
 
         self.refresh_configs()
-        summary = f"Импорт завершён: добавлено {imported}, заменено {replaced}, пропущено {skipped}"
+        summary = f"\u0418\u043c\u043f\u043e\u0440\u0442 \u0437\u0430\u0432\u0435\u0440\u0448\u0451\u043d: \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u043e {imported}, \u0437\u0430\u043c\u0435\u043d\u0435\u043d\u043e {replaced}, \u043f\u0440\u043e\u043f\u0443\u0449\u0435\u043d\u043e {skipped}"
         if errors:
-            summary += f", ошибок {errors}"
+            summary += f", \u043e\u0448\u0438\u0431\u043e\u043a {errors}"
         self.set_status(summary, "ok" if errors == 0 else "error")
-        QMessageBox.information(self, "Импорт конфигов", summary + ".")
+        show_info(self, "\u0418\u043c\u043f\u043e\u0440\u0442 \u043a\u043e\u043d\u0444\u0438\u0433\u043e\u0432", summary + ".")
 
     # --- Worker/progress handling ---
     def set_busy(self, busy: bool, text: str = "") -> None:
@@ -1037,7 +1078,11 @@ class MainWindow(QMainWindow):
 
     def start_worker(self, fn, *args, busy_text: str, success_message: str, on_success=None) -> None:
         if self.current_copy_worker and self.current_copy_worker.isRunning():
-            QMessageBox.information(self, "Операция выполняется", "Дождитесь завершения текущей операции.")
+            show_info(
+                self,
+                "\u041e\u043f\u0435\u0440\u0430\u0446\u0438\u044f \u0432\u044b\u043f\u043e\u043b\u043d\u044f\u0435\u0442\u0441\u044f",
+                "\u0414\u043e\u0436\u0434\u0438\u0442\u0435\u0441\u044c \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u0438\u044f \u0442\u0435\u043a\u0443\u0449\u0435\u0439 \u043e\u043f\u0435\u0440\u0430\u0446\u0438\u0438.",
+            )
             return
         worker = CopyWorker(fn, *args)
         self.current_copy_worker = worker
@@ -1056,7 +1101,7 @@ class MainWindow(QMainWindow):
             self.set_busy(False)
             self.current_copy_worker = None
             self.set_status(success_message, "ok")
-            QMessageBox.information(self, "Готово", success_message)
+            show_info(self, "\u0413\u043e\u0442\u043e\u0432\u043e", success_message)
             if on_success:
                 try:
                     on_success(result)
@@ -1067,8 +1112,8 @@ class MainWindow(QMainWindow):
             self.set_busy(False)
             self.current_copy_worker = None
             LOGGER.error("Operation failed: %s\n%s", message, details)
-            self.set_status("Ошибка", "error")
-            QMessageBox.critical(self, "Ошибка", str(message))
+            self.set_status("\u041e\u0448\u0438\u0431\u043a\u0430", "error")
+            show_error(self, "\u041e\u0448\u0438\u0431\u043a\u0430", str(message))
 
         worker.progress.connect(on_progress)
         worker.finished.connect(on_finished)

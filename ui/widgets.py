@@ -8,9 +8,12 @@ from typing import Optional
 from PySide6.QtCore import QModelIndex, QRect, QSize, Qt, Signal
 from PySide6.QtGui import QAction, QColor, QFont, QIcon, QPainter, QPainterPath, QPixmap
 from PySide6.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
     QFrame,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QMenu,
     QPushButton,
     QSizePolicy,
@@ -217,3 +220,134 @@ class ConfigCard(QFrame):
         btn_col.addWidget(self.apply_btn)
         btn_col.addWidget(self.more_btn)
         layout.addLayout(btn_col)
+
+def _inherit_parent_style(dialog: QDialog, parent: Optional[QWidget]) -> None:
+    if parent is not None and hasattr(parent, "styleSheet"):
+        ss = parent.styleSheet()
+        if ss:
+            dialog.setStyleSheet(ss)
+    dialog.setMinimumWidth(360)
+
+
+class RenameDialog(QDialog):
+    def __init__(self, parent: Optional[QWidget], title: str, label: str, text: str = ""):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setModal(True)
+        _inherit_parent_style(self, parent)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
+
+        self.label = QLabel(label)
+        self.label.setWordWrap(True)
+        layout.addWidget(self.label)
+
+        self.line_edit = QLineEdit(text)
+        self.line_edit.selectAll()
+        layout.addWidget(self.line_edit)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        ok_btn = buttons.button(QDialogButtonBox.Ok)
+        cancel_btn = buttons.button(QDialogButtonBox.Cancel)
+        if ok_btn:
+            ok_btn.setText("OK")
+        if cancel_btn:
+            cancel_btn.setText("\u041e\u0442\u043c\u0435\u043d\u0430")
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+        self.line_edit.returnPressed.connect(self.accept)
+
+    def text_value(self) -> str:
+        return self.line_edit.text()
+
+    @staticmethod
+    def get_text(parent: Optional[QWidget], title: str, label: str, text: str = "") -> tuple[str, bool]:
+        dlg = RenameDialog(parent, title, label, text)
+        ok = dlg.exec() == QDialog.Accepted
+        return dlg.text_value(), ok
+
+
+class MessageDialog(QDialog):
+    def __init__(
+        self,
+        parent: Optional[QWidget],
+        title: str,
+        text: str,
+        icon: QStyle.StandardPixmap = QStyle.SP_MessageBoxInformation,
+        buttons: QDialogButtonBox.StandardButtons = QDialogButtonBox.Ok,
+    ):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setModal(True)
+        _inherit_parent_style(self, parent)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
+
+        row = QHBoxLayout()
+        row.setSpacing(12)
+        icon_label = QLabel()
+        icon_pix = self.style().standardIcon(icon).pixmap(32, 32)
+        icon_label.setPixmap(icon_pix)
+        icon_label.setFixedSize(36, 36)
+        icon_label.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
+        row.addWidget(icon_label, 0, Qt.AlignTop)
+
+        text_label = QLabel(text)
+        text_label.setWordWrap(True)
+        text_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        row.addWidget(text_label, 1)
+        layout.addLayout(row)
+
+        self.button_box = QDialogButtonBox(buttons)
+        self._localize_buttons()
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
+        layout.addWidget(self.button_box)
+
+    def _localize_buttons(self) -> None:
+        mapping = {
+            QDialogButtonBox.Ok: "OK",
+            QDialogButtonBox.Cancel: "\u041e\u0442\u043c\u0435\u043d\u0430",
+            QDialogButtonBox.Yes: "\u0414\u0430",
+            QDialogButtonBox.No: "\u041d\u0435\u0442",
+        }
+        for std, label in mapping.items():
+            btn = self.button_box.button(std)
+            if btn:
+                btn.setText(label)
+
+
+def show_info(parent: Optional[QWidget], title: str, text: str) -> None:
+    dlg = MessageDialog(parent, title, text, QStyle.SP_MessageBoxInformation, QDialogButtonBox.Ok)
+    dlg.exec()
+
+
+def show_warning(parent: Optional[QWidget], title: str, text: str) -> None:
+    dlg = MessageDialog(parent, title, text, QStyle.SP_MessageBoxWarning, QDialogButtonBox.Ok)
+    dlg.exec()
+
+
+def show_error(parent: Optional[QWidget], title: str, text: str) -> None:
+    dlg = MessageDialog(parent, title, text, QStyle.SP_MessageBoxCritical, QDialogButtonBox.Ok)
+    dlg.exec()
+
+
+def ask_yes_no(parent: Optional[QWidget], title: str, text: str) -> bool:
+    dlg = MessageDialog(
+        parent,
+        title,
+        text,
+        QStyle.SP_MessageBoxQuestion,
+        QDialogButtonBox.Yes | QDialogButtonBox.No,
+    )
+    no_btn = dlg.button_box.button(QDialogButtonBox.No)
+    if no_btn:
+        no_btn.setDefault(True)
+        no_btn.setFocus()
+    return dlg.exec() == QDialog.Accepted
