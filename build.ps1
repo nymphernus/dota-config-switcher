@@ -1,4 +1,4 @@
-﻿param(
+param(
     [switch]$Clean
 )
 
@@ -27,7 +27,6 @@ chcp 65001 | Out-Null
     --name "DotaConfigSwitcher" `
     --icon "icon.ico" `
     --add-data "icon.ico;." `
-    --add-data "icon.png;." `
     main.py
 
 if ($LASTEXITCODE -ne 0) {

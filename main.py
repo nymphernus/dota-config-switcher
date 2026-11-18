@@ -69,7 +69,7 @@ def main() -> int:
     app.setApplicationName(APP_NAME)
     app.setQuitOnLastWindowClosed(False)
 
-    icon_path = get_resource_path("icon.png")
+    icon_path = get_resource_path("icon.ico")
     if icon_path.exists():
         app.setWindowIcon(QIcon(str(icon_path)))
 
