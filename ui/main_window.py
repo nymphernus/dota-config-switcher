@@ -134,14 +134,26 @@ class MainWindow(QMainWindow):
 
         top_layout.addStretch(1)
 
-        self.change_path_btn = QToolButton()
-        self.change_path_btn.setObjectName("IconButton")
-        self.change_path_btn.setToolTip("\u0412\u044b\u0431\u0440\u0430\u0442\u044c \u043f\u0430\u043f\u043a\u0443 Steam")
-        self.change_path_btn.setIcon(self.style().standardIcon(QStyle.SP_DirOpenIcon))
-        self.change_path_btn.setIconSize(QSize(18, 18))
-        self.change_path_btn.setFixedSize(32, 32)
-        self.change_path_btn.clicked.connect(self.choose_steam_path)
-        top_layout.addWidget(self.change_path_btn, 0, Qt.AlignVCenter)
+        header_actions = QHBoxLayout()
+        header_actions.setSpacing(8)
+
+        self.minimize_to_tray_btn = QToolButton()
+        self.minimize_to_tray_btn.setObjectName("IconButton")
+        self.minimize_to_tray_btn.setToolTip("\u0421\u0432\u0435\u0440\u043d\u0443\u0442\u044c \u0432 \u0442\u0440\u0435\u0439")
+        self.minimize_to_tray_btn.setIcon(self.style().standardIcon(QStyle.SP_TitleBarMinButton))
+        self.minimize_to_tray_btn.setIconSize(QSize(18, 18))
+        self.minimize_to_tray_btn.setFixedSize(32, 32)
+        self.minimize_to_tray_btn.clicked.connect(self.hide)
+        header_actions.addWidget(self.minimize_to_tray_btn, 0, Qt.AlignVCenter)
+
+        self.exit_app_btn = QToolButton()
+        self.exit_app_btn.setObjectName("IconButton")
+        self.exit_app_btn.setToolTip("\u0412\u044b\u0445\u043e\u0434")
+        self.exit_app_btn.setIcon(self.style().standardIcon(QStyle.SP_TitleBarCloseButton))
+        self.exit_app_btn.setIconSize(QSize(18, 18))
+        self.exit_app_btn.setFixedSize(32, 32)
+        self.exit_app_btn.clicked.connect(self.quit_from_tray)
+        header_actions.addWidget(self.exit_app_btn, 0, Qt.AlignVCenter)
 
         self.settings_btn = QToolButton()
         self.settings_btn.setObjectName("IconButton")
@@ -149,8 +161,9 @@ class MainWindow(QMainWindow):
         self.settings_btn.setText("\u2699")
         self.settings_btn.setFixedSize(32, 32)
         self.settings_btn.clicked.connect(self.open_settings_dialog)
-        top_layout.addWidget(self.settings_btn, 0, Qt.AlignVCenter)
+        header_actions.addWidget(self.settings_btn, 0, Qt.AlignVCenter)
 
+        top_layout.addLayout(header_actions)
         root.addWidget(top_bar)
 
         # Center area (scrollable config cards)
@@ -241,24 +254,6 @@ class MainWindow(QMainWindow):
         actions_row.addWidget(self.refresh_profiles_btn, 0, Qt.AlignVCenter)
 
         actions_row.addStretch(1)
-
-        self.minimize_tray_btn = QToolButton()
-        self.minimize_tray_btn.setObjectName("IconButton")
-        self.minimize_tray_btn.setIcon(self.style().standardIcon(QStyle.SP_TitleBarMinButton))
-        self.minimize_tray_btn.setIconSize(QSize(18, 18))
-        self.minimize_tray_btn.setFixedSize(32, 32)
-        self.minimize_tray_btn.setToolTip("\u0421\u0432\u0435\u0440\u043d\u0443\u0442\u044c \u0432 \u0442\u0440\u0435\u0439")
-        self.minimize_tray_btn.clicked.connect(self.hide)
-        actions_row.addWidget(self.minimize_tray_btn, 0, Qt.AlignVCenter)
-
-        self.exit_btn = QToolButton()
-        self.exit_btn.setObjectName("IconButton")
-        self.exit_btn.setIcon(self.style().standardIcon(QStyle.SP_TitleBarCloseButton))
-        self.exit_btn.setIconSize(QSize(18, 18))
-        self.exit_btn.setFixedSize(32, 32)
-        self.exit_btn.setToolTip("\u0412\u044b\u0445\u043e\u0434")
-        self.exit_btn.clicked.connect(self.quit_from_tray)
-        actions_row.addWidget(self.exit_btn, 0, Qt.AlignVCenter)
 
         bottom_layout.addLayout(actions_row)
 
@@ -1049,8 +1044,9 @@ class MainWindow(QMainWindow):
             self.refresh_profiles_btn,
             self.empty_save_btn,
             self.empty_import_btn,
-            self.change_path_btn,
             self.settings_btn,
+            self.minimize_to_tray_btn,
+            self.exit_app_btn,
             self.favorite_btn,
             self.account_combo,
         ]
