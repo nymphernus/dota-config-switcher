@@ -21,6 +21,8 @@ if (Test-Path ".\.venv\Scripts\pyinstaller.exe") {
     $pyinstaller = ".\.venv\Scripts\pyinstaller.exe"
 }
 
+chcp 65001 | Out-Null
+
 & $pyinstaller --noconfirm --clean --onefile --windowed `
     --name "DotaConfigSwitcher" `
     --icon "icon.ico" `
