@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+os.environ["QT_NO_NATIVE_MENUS"] = "1"
 import sys
 
 if sys.stdout is not None:
